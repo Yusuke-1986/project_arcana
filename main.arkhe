@@ -1,0 +1,31 @@
+VINST a: inte = 10;
+VINST b: inte = 20;
+VINST veritas: inte = 0;
+
+/// '->' is definition left is right(process has defined inside '{}')
+MINST potentia: inte (a: inte, b: inte ) -> {
+    REDITUS a ** b;
+};
+
+/// using function not need type annotation
+/// '<-' is bridge right to left
+indicant() <- a + b; 
+
+/// When the number of arguments exceeds two, use tuples. When the argument is a tuple, use nested tuples. 
+veritas = potentia() <- (a, b); 
+indicant() <- veritas;
+
+REPETITIO (prima: i=1, conditio: i<10, gradu: +1) {
+    indicant() <- cantus'Current value: ${ i }';
+};
+
+SI conditio: (1==1){
+    /// True
+    VERUM {
+        indicant() <- 'verum';
+    }
+    /// False
+    FALSUM {
+        indicant() <- 'falsum';
+    }
+};
