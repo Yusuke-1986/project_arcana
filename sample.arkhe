@@ -1,43 +1,14 @@
-VINST a: inte = 1;
-VINST b: inte = 10;
-VINST c: inte = 2;
-VINST msg: filum = cantus'a: {a}, b: {b}, c: {c} a + b: {a + b}';
-VINST var_1: inte = 0;
-VINST var_2: real = 0;
+<FONS>
+</FONS>
 
-MINST Potentia: inte (a: inte, b: inte) -> {
-    REDITUS a ** b;
+<INTRODUCTIO>
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON a: inte = 10;
+    VCON b: inte = 2;
+    VCON msg: filum = cantus'a=${a}, b=${b}, a+b=${a+b}';
+    indicant() <- msg;
 };
-
-MINST MsgIndicant: nihil () -> {
-    indicant () <- msg;
-    REDITUS NIHIL;
-};
-
-MsgIndicant () <- ();
-
-var_1 = Potentia () <- (b, c);
-var_2 = a / c;
-
-indicant () <- var_1;
-indicant () <- var_2;
-
-REPETITIO (prima: i=1, conditio: i<11, gradu: +1) {
-    indicant () <- "count 1";
-    SI conditio: (i % 2 == 0){
-        VERUM {
-            indicant () <- cantus'{i} = even. count 2';
-        }
-        FALSUM {
-            indicant () <- cantus'{i} = odd. count 2';
-            SI conditio: (i == 1){
-                VERUM {
-                    indicant () <- "count 3 one.";
-                }
-                FALSUM {
-                    indicant () <- "not under two";
-                }
-            };
-        }
-    };
-};
+</DOCTRINA>
