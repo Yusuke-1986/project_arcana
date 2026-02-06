@@ -52,9 +52,9 @@ FCON subjecto: nihil () -> {
     indicant () <- var_1;
     indicant () <- var_2;
 
-    RECURSIO (prima: i=1, conditio: i<11, gradu: +1) {
+    RECURSIO (propositio: i<11) {
         indicant () <- "count 1";
-        SI conditio: (i % 2 == 0){
+        SI propositio: (i % 2 == 0){
             VERUM {
                 indicant () <- cantus'${i} = even. count 2';
             }
@@ -66,6 +66,7 @@ FCON subjecto: nihil () -> {
                     }
                     FALSUM {
                         indicant () <- "not under two";
+                        effigum;
                     }
                 };
             }
