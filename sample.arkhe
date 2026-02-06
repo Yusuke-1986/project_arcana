@@ -6,9 +6,13 @@
 
 <DOCTRINA>
 FCON subjecto: nihil () -> {
-    VCON a: inte = 10;
-    VCON b: inte = 2;
-    VCON msg: filum = cantus'a=${a}, b=${b}, a+b=${a+b}';
-    indicant() <- msg;
+  VCON a: inte = 3;
+  VCON b: inte = 1;
+
+  SI propositio: ((a > 0) et non (b == 2)) {
+    VERUM { indicant() <- "ok"; }
+    FALSUM { indicant() <- "ng"; }
+  };
 };
+
 </DOCTRINA>
