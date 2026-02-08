@@ -144,6 +144,18 @@ primary = Identifier
 
 ### commands
 
+### Install(development)
+
+```bash
+cd arcana # project root
+pip install -e .
+
+# via module
+py -m arcana exsecutio file.arkhe [options]
+# or via installed command
+arcana exsecutio file.arkhe [options]
+```
+
 - run code
 
 ```bash

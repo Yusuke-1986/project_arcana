@@ -66,8 +66,9 @@ KEYWORDS = {
     "FCON", "VCON", 
     "SI", "VERUM", "FALSUM", 
     "RECURSIO", "effigum", "proximum",
-    "et", "aut", "non"}
-TYPE_NAMES = {"nihil", "inte", "real", "filum"}
+    "et", "aut", "non", "nihil"}
+TYPE_NAMES = {"inte", "real", "verum", "filum"}
+SPECIAL_KEY = {"nihil"}
 
 TOKEN_SPEC = [
     ("FLOW", r"<-"),
@@ -231,6 +232,10 @@ class Unary(Expr):
     op: str
     expr: Expr
 
+@dataclass
+class Through(Stmt):
+    pass
+
 
 # ========================
 # Parser (minimal Pratt)
@@ -275,7 +280,13 @@ class Parser:
         self.eat("KW","FCON")
         name=self.eat("IDENT").value
         self.eat("COLON")
-        self.eat("TYPE")  # nihil
+        t = self.cur()
+        if t.kind == "TYPE":
+            self.i += 1
+        elif t.kind == "KW" and t.value == "nihil":
+            self.i += 1
+        else:
+            raise SyntaxError("Expected return type")
         self.eat("LPAREN")
         self.eat("RPAREN")
         self.eat("ARROW")
@@ -294,6 +305,12 @@ class Parser:
         return FuncDecl(name,stmts)
 
     def parse_stmt(self):
+        # nihil;
+        if self.match("KW", "nihil"):
+            self.eat("KW", "nihil")
+            self.eat("SEMICOLON")
+            return Through()
+        
         # VCON
         if self.match("KW","VCON"):
             self.eat("KW","VCON")
@@ -406,13 +423,10 @@ class Parser:
         call=self.parse_call_empty()
         self.eat("FLOW")
 
-        
-
         arg=self.parse_expr()
         self.eat("SEMICOLON")
         return ExprStmt(FlowCall(call,arg))
     
-        
     def parse_call_empty(self):
         name=self.eat("IDENT").value
         self.eat("LPAREN")
@@ -546,7 +560,6 @@ class Parser:
 
         return left
 
-
 # ========================
 # Transpile
 # ========================
@@ -609,6 +622,9 @@ def emit_gradu_update(g: GraduOpe) -> str:
 def emit_stmt(s,indent=0):
 
     pad=" "*indent
+
+    if isinstance(s, Through):
+        return [pad + "pass"]
 
     if isinstance(s,FuncDecl):
         lines=[f"{pad}def {s.name}():"]
@@ -674,7 +690,6 @@ def has_effigum(stmts):
 
     return False
 
-
 def validate_recur_guard(stmts):
     for s in stmts:
 
@@ -697,7 +712,6 @@ def validate_recur_guard(stmts):
             validate_recur_guard(s.else_body)
             continue
 
-
 def validate_types(stmts):
     for s in stmts:
 
@@ -719,7 +733,6 @@ def validate_types(stmts):
         if isinstance(s, RecurStmt):
             validate_types(s.body)
 
-
 def is_propositio_expr(e) -> bool:
     if isinstance(e, Compare):
         return True
@@ -731,7 +744,6 @@ def is_propositio_expr(e) -> bool:
     if isinstance(e, Id):
         return True
     return False
-
 
 def transpile(ast):
     out=["# transpiled Arcana\n"]

@@ -2,10 +2,10 @@
 # Arcana minimal runner
 import argparse
 
-from lexer import *
-from DEF_AST import *
-from parser import Parser
-from transpiler import *
+from .lexer import *
+from .ast import *
+from .parser import Parser
+from .transpiler import *
 
 from datetime import datetime
 
@@ -57,7 +57,7 @@ def run_file(path: str, emit: bool=False, no_run: bool=False) -> None:
         else:
             print("[arcana] contraindication:", e)
 
-def main() -> None:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="arcana")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -84,6 +84,4 @@ def main() -> None:
 
         tr(f"[arcana] exsecutio completed in {delta.total_seconds()} seconds.")
 
-
-if __name__ == "__main__":
-    main()
+        return 0

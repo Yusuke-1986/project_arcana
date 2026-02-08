@@ -1,7 +1,7 @@
 # ========================
 # Parser (minimal Pratt) ver.1.0
 # ========================
-from DEF_AST import *
+from .ast import *
 # from types import int
 
 

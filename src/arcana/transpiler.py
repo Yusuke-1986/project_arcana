@@ -2,7 +2,7 @@
 # Transpiler ver.1.0
 # ========================
 
-from DEF_AST import *
+from .ast import *
 import re
 
 BUILTINS={"indicant":"print", "accipere":"input", "longitudo":"len", "figura":"type"}

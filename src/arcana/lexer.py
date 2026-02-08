@@ -1,15 +1,10 @@
-from dataclasses import dataclass
+from .ast import Token
 import re
 # ========================
 # Lexer(Tokenizer) ver.1.0
 # 
 # 
 # ========================
-
-@dataclass
-class Token:
-    kind: str
-    value: str
 
 # セクション名
 SECTION_TAG = {"FONS", "INTRODUCTIO", "DOCTRINA"}
