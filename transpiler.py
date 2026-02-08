@@ -59,7 +59,7 @@ def emit_stmt(s,indent=0):
         lines.append(f"{pad}while ({emit_expr(s.propositio)}) and (__i < __prima):")
         for st in s.body:
             lines += emit_stmt(st, indent+4)
-        lines.append(f"{pad}    {emit_gradu_update(s.gradu)}")
+        lines.append(f"{pad}    {emit_acceleratio_update(s.acceleratio)}")
         return lines
     
     # break
@@ -149,7 +149,7 @@ def emit_expr(e):
 
     raise NotImplementedError(e)
 
-def emit_gradu_update(g: GraduOpe) -> str:
+def emit_acceleratio_update(g: acceleratioOpe) -> str:
     if g.op == "++":
         return "__i += 1"
     if g.op == "--":

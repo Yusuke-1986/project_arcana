@@ -41,8 +41,8 @@ Control label
 | words | intent | 意味 |
 | ----- | ----- | ----- |
 | propositio | continuous condition | (分岐するための)命題 |
-| prima | initial value | 初期値 |
-| gradu | step value | ステップ |
+| quota | loop limit | ループ回数(デフォルト:100) |
+| acceleratio | step value | ステップ |
 | effgium | break | 脱出 |
 | proximum | continue, next | 次へ |
 | non | not | ￢ |
@@ -94,9 +94,34 @@ define_section = "<INTRODUCTIO>", { statement }, "</INTRODUCTIO>" ;
 main_section = "<DOCTRINA>", main_statement, "</DOCTRINA>" ;
 
 (* Statement *)
-statement = variable_declare | function_declare | class_declare | if_statement | loop_statement | expr_stmt ;
-inner_statement = variable_declare | if_statement | loop_statement | expr_stmt ;
+statement = variable_declare
+          | function_declare
+          | class_declare
+          | if_statement 
+          | loop_statement 
+          | expr_stmt ;
+
+inner_statement = variable_declare 
+                | if_statement 
+                | loop_statement 
+                | expr_stmt ;
+
 expr_stmt = expr, ";" ;
+
+loop_statement = "RECURSIO", "(", 
+                    propositio,
+                     [",", quota], 
+                     [",", acceleratio], 
+                ")", "->",
+                "{", { inner_statement }, "}", ";" ;
+
+propositio = "propositio", ":", "(", bool_expr, ")" ;
+bool_expr = expr ; (* semantic: return boolean *)
+quota = "quota", ":", init_expr ; (* Max loop, default = 100 *)
+init_expr = assignment | expr ;
+assignment = Identifier, "=", expr ;
+acceleratio = "acceleratio", ":", step_expr ; (* step value, default = counter += 1 *)
+step_expr = expr ; (* semantic: >0 *)
 
 (* Declare *)
 main_statement = "FCON", "subjecto", ":", "nihil", "(", ")", "->", "{", { inner_statement }, "}", ";" ;
@@ -104,17 +129,16 @@ function_declare = "FCON", Identifier, ":", Type, "(", [ arg_list ], ")", "->", 
 variable_declare = "VCON", Identifier, ":", Type, ["=", expr], ";" ;
 
 (* expression *)
-expr = aut_expr | et_expr | non_expr ;
-aut_expr = "aut", "(", expr, ",", expr, ")" ;
-et_expr = "et",  "(", expr, ",", expr, ")" ;
-non_expr = [ "non" ], comparison ;
+expr = comparison ;
 
 comparison = add, [ ( "==" | "><" | "<" | ">" | "<=" | ">=" ), add ] ;
-add = mltp, { ( "+" | "-" ), mltp } ;
-mltp = primary, { ( "*" | "/" | "**" | "%" ), primary } ;
-primary = Identifier | number | "(" , expr , ")" | func_call ;
-
-func_call = Identifier, "(", [ expr_list ], ")" ;
+add = mul, { ( "+" | "-" ), mul } ;
+mul = pow, { ( "*" | "/" | "%" ), pow } ;
+pow = postfix, { "**", postfix } ;
+postfix = primary, { "(", [ expr_list ], ")" } ;
+primary = Identifier 
+        | number 
+        | "(" , expr , ")" ;
 
 ```
 
@@ -155,3 +179,5 @@ func_call = Identifier, "(", [ expr_list ], ")" ;
 | accipere | input | accipere: filum (*args) <- expr |
 | longitudo | len | longitude: inte (*args) <- expr |
 | figura | type | figure: filum (*args) <- expr |
+| tempus | datetime.now | *** |
+| chronos | timedelta.total_seconds | *** |

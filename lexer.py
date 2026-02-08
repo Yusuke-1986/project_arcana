@@ -25,7 +25,7 @@ KEYWORDS = {
 CONTROL_LABEL = {
     "effigum", "proximum",
     "et", "aut", "non", 
-    "propositio", "prima", "gradu"
+    "propositio", "quota", "acceleratio",
 }
 
 TYPE_LIST = {    

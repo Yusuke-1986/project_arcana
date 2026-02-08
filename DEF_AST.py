@@ -103,7 +103,7 @@ class IfStmt(Stmt):
 
 # step
 @dataclass
-class GraduOpe:
+class acceleratioOpe:
     op: str          # "++" | "--" | "+=" | "-="
     value: int = 1   # ++/-- は 1、+=/-= は指定値
 
@@ -112,7 +112,7 @@ class GraduOpe:
 class RecurStmt(Stmt):
     prima: Expr      # まずは Expr にしておく（INTだけでもOK）
     propositio: Expr
-    gradu: GraduOpe
+    acceleratio: acceleratioOpe
     body: list
 
 # break

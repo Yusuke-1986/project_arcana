@@ -175,24 +175,24 @@ class Parser:
             self.eat("LPAREN")
 
             # defaults
-            prima = Num("100")              # デフォルト上限
+            quota = Num("100")              # デフォルト上限
             propositio = Num("1")             # 1==True扱い（簡易）
-            gradu = GraduOpe("++", 1)
+            acceleratio = acceleratioOpe("++", 1)
 
-            # header: prima / propositio / gradu (order-free)
+            # header: quota / propositio / acceleratio (order-free)
             while not self.match("RPAREN"):
-                key = self.eat("CTRL").value   # "prima" | "propositio" | "gradu"
+                key = self.eat("CTRL").value   # "quota" | "propositio" | "acceleratio"
                 self.eat("COLON")
 
-                if key == "prima":
-                    prima = self.parse_expr()
+                if key == "quota":
+                    quota = self.parse_expr()
                 elif key == "propositio":
                     propositio = self.parse_expr()
                     if self.contains_call(propositio):
                         raise SyntaxError("RECURSIO propositio: function call is not allowed")
 
-                elif key == "gradu":
-                    gradu = self.parse_gradu_ope()
+                elif key == "acceleratio":
+                    acceleratio = self.parse_acceleratio_ope()
                 else:
                     raise SyntaxError(f"Unknown RECURSIO header key: {key}")
 
@@ -208,7 +208,7 @@ class Parser:
 
             self.eat("RBRACE")
             self.eat("SEMICOLON")
-            return RecurStmt(prima, propositio, gradu, body)
+            return RecurStmt(quota, propositio, acceleratio, body)
 
         # flowcall
         call=self.parse_call_empty()
@@ -224,23 +224,23 @@ class Parser:
         self.eat("RPAREN")
         return CallEmpty(name)
     
-    def parse_gradu_ope(self) -> GraduOpe:
+    def parse_acceleratio_ope(self) -> acceleratioOpe:
         t = self.cur()
         if t.kind == "INCR":
             self.i += 1
-            return GraduOpe("++", 1)
+            return acceleratioOpe("++", 1)
         if t.kind == "DECR":
             self.i += 1
-            return GraduOpe("--", 1)
+            return acceleratioOpe("--", 1)
         if t.kind == "PLUSEQ":
             self.i += 1
             n = int(self.eat("INT").value)
-            return GraduOpe("+=", n)
+            return acceleratioOpe("+=", n)
         if t.kind == "MINUSEQ":
             self.i += 1
             n = int(self.eat("INT").value)
-            return GraduOpe("-=", n)
-        raise SyntaxError(f"Bad gradu ope token={t}")
+            return acceleratioOpe("-=", n)
+        raise SyntaxError(f"Bad acceleratio ope token={t}")
 
     def contains_call(self, expr):
         if isinstance(expr, CallEmpty):
