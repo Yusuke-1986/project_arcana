@@ -1,0 +1,89 @@
+# arcana.py　ver.0.2
+# Arcana minimal runner
+import argparse
+
+from lexer import *
+from DEF_AST import *
+from parser import Parser
+from transpiler import *
+
+from datetime import datetime
+
+VERSION = 0.2
+
+# --- tracing ---
+TRACE = False
+
+def tr(msg: str) -> None:
+    if TRACE:
+        print(f"[arcana: trace]> {msg}")
+
+# ========================
+# Runner
+# ========================
+
+def run_file(path: str, emit: bool=False, no_run: bool=False) -> None:
+    with open(path, "r", encoding="utf-8") as f:
+        src = f.read()
+
+    try:
+        # src = strip_line_comments(src)
+        toks = tokenize(src)
+        tr(f"TOKENS: {[(t.kind, t.value) for t in toks]}")
+        ast = Parser(toks).parse()
+        tr(f"PARSE: {ast}")
+        # sys.exit()
+        validate_recur_guard(ast)
+        validate_types(ast)
+        py = transpile(ast)
+        
+        if emit:
+            print("=== [arcana perscribere] transpiled python ===")
+            print(py)
+            print("=== [arcana perscribere] end ===")
+        if no_run:
+            return
+        
+        # Minimal execution environment
+        print("=== [arcana: oraculum] ===")
+        env = {"__name__": "__main__"}
+        exec(compile(py, "<arcana>", "exec"), env, env)
+
+    except Exception as e:
+        if PYTRACE:
+            import traceback
+            print("[arcana] contraindication:", e)
+            traceback.print_exc()
+        else:
+            print("[arcana] contraindication:", e)
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="arcana")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p_run = sub.add_parser("exsecutio", help="run .arkhe source")
+    p_run.add_argument("file", help="e.g. main.arkhe")
+    p_run.add_argument("--perscribere", action="store_true", help="print transpiled python code")
+    p_run.add_argument("--non-run", action="store_true", help="emit only, do not execute")
+    p_run.add_argument("--vestigium", action="store_true", help="print parser/transpiler trace")
+    p_run.add_argument("--pytrace", action="store_false", help="do not print python traceback")
+
+    args = ap.parse_args()
+
+    print(f"arcana: python transpiler ver v.{VERSION}")
+    
+    if args.cmd == "exsecutio": # exsecutioあれば実行
+        start = datetime.now()
+        global TRACE
+        TRACE = args.vestigium
+        global PYTRACE
+        PYTRACE = args.pytrace
+        run_file(args.file, emit=args.perscribere, no_run=args.non_run)
+        end = datetime.now()
+        delta = end - start
+
+        tr(f"[arcana] exsecutio completed in {delta.total_seconds()} seconds.")
+
+
+if __name__ == "__main__":
+    main()

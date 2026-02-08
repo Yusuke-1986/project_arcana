@@ -6,13 +6,42 @@
 
 <DOCTRINA>
 FCON subjecto: nihil () -> {
-  VCON a: inte = 3;
-  VCON b: inte = 1;
-
-  SI propositio: ((a > 0) et non (b == 2)) {
-    VERUM { indicant() <- "ok"; }
-    FALSUM { indicant() <- "ng"; }
-  };
+    VCON i:inte = 1;
+    RECURSIO (propositio: (i < 101)){
+        SI propositio: (i % 15 == 0){
+            VERUM{
+                indicant () <- "FizzBuzz";
+            }
+            FALSUM{
+                SI propositio: (i % 3 == 0){
+                    VERUM{
+                        indicant () <- "Fizz";
+                    }
+                    FALSUM{
+                        SI propositio: (i % 5 == 0){
+                            VERUM{
+                                indicant () <- "Buzz";
+                            }
+                            FALSUM{
+                                indicant () <- i;
+                            }
+                        };
+                    }
+                };   
+            }
+        };
+        
+        i += 1;
+        
+        SI propositio: (i > 100){
+            VERUM{
+                indicant () <- "limit over.";
+                effigum;
+            }
+            FALSUM{
+                nihil;
+            }
+        };
+    };
 };
-
 </DOCTRINA>

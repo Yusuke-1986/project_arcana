@@ -1,0 +1,11 @@
+<FONS>
+</FONS>
+
+<INTRODUCTIO>
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    indicant () <- "Hello, world!";
+};
+</DOCTRINA>
