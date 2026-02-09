@@ -6,11 +6,11 @@
 
 <DOCTRINA>
 FCON subjecto: nihil () -> {
-    VCON ans: inte = 1;
-    RECURSIO (propositio: (ans >< 10)) -> {
-        ans = ans + 1;
-        indicant () <- ("current");
-        indicant () <- (ans);
-    };
+    VCON s:filum = accipere() <- ("name? ");
+    indicant() <- (s);
+    VCON n:filum = accipere() <- ("number? ");
+    indicant() <- (n*2);
+    VCON conv_n:inte = inte() <- (n);
+    indicant() <- (conv_n*2);
 };
 </DOCTRINA>

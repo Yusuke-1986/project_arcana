@@ -152,11 +152,12 @@ class Parser:
             if self.peek(1).kind == "PLUS" and self.peek(2).kind == "ASSIGN":
                 raise parse_error(ErrorCode.PARSE_UNSUPPORTED_SYNTAX, "'+=' is not supported in v0.3. Use: i = i + 1;", self.span0())
 
-            # call: IDENT ( ) FLOW ( args... ) ;
-            if self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
-                call = self.parse_call_expr()
-                self.eat("SEMICOLON")
-                return CallStmt(span=self.span0(), call=call)
+            # call: (IDENT|TYPE) ( ) FLOW ( ... ) ;
+            if self.cur().kind in ("IDENT", "TYPE"):
+                if self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
+                    call = self.parse_call_expr()
+                    self.eat("SEMICOLON")
+                    return CallStmt(span=self.span0(), call=call)
 
             # move: IDENT FLOW IDENT ;
             if self.peek(1).kind == "FLOW":
@@ -196,7 +197,12 @@ class Parser:
         return VarDecl(span=self.span0(), name=name, typ=t, init=init)
 
     def parse_call_expr(self) -> CallExpr:
-        name = self.eat("IDENT").value
+        t = self.cur()
+        if t.kind not in ("IDENT", "TYPE"):
+            raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN,
+                      f"Quid est hoc! Quid faciam?: {t}",
+                      self.span0(),)
+        name = self.eat(t.kind).value
         self.eat("LPAREN"); self.eat("RPAREN")
         self.eat("FLOW")  # '<-'
         args = self.parse_args_tuple_required()
@@ -360,8 +366,8 @@ class Parser:
         return left
 
     def parse_primary(self) -> Expr:
-        # call_expr as expression: IDENT () <- (args_tuple)
-        if self.match("IDENT") and self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
+        # call_expr as expression: (IDENT | TYPE) () <- (args_tuple)
+        if self.cur().kind in ("IDENT", "TYPE") and self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
             return self.parse_call_expr()
 
         if self.match("IDENT"):

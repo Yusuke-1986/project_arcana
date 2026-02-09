@@ -44,6 +44,11 @@ class _Transpiler:
         # future:
         # "tempus": "...",
         # "chronos": "...",
+        # casts (type-name call)
+        "inte": "int",
+        "real": "float",
+        "filum": "str",
+        "verum": "__arcana_verum",
     }
 
     def __init__(self) -> None:
@@ -70,17 +75,17 @@ class _Transpiler:
 
     # ---- prelude ----
     def _emit_prelude(self) -> None:
-        self._lines.append("# === [arcana transpiled python] ===")
-        self._lines.append("")
+        # self._lines.append("# === [arcana transpiled python] ===")
+        # self._lines.append("")
         self._lines.append("class ArcanaRuntimeError(RuntimeError):")
         self._lines.append("    def __init__(self, code, message):")
         self._lines.append("        self.code = code")
         self._lines.append("        self.message = message")
         self._lines.append("        super().__init__(f'[{code}] {message}')")
         self._lines.append("")
-        self._lines.append("def __arcana_assert_positive(code, name, value):")
+        self._lines.append("def __arcana_assert_positive(code, value):")
         self._lines.append("    if value <= 0:")
-        self._lines.append("        raise ArcanaRuntimeError(code, name + ' must be > 0.')")
+        self._lines.append("        raise ArcanaRuntimeError(code, 'stationarius accelerationis')")
         self._lines.append("")
         self._lines.append("")
 
@@ -170,8 +175,8 @@ class _Transpiler:
 
         # runtime validations (dynamic expr 対応)
         self._lines.append(ctx.pad() + f"if {quota_var} < 0:")
-        self._lines.append(ctx.pad() + f"    raise ArcanaRuntimeError('{R_VERITATEM_NON_ATTIGI}', 'quota must be >= 0.')")
-        self._lines.append(ctx.pad() + f"__arcana_assert_positive('{E_LOOP_STEP_NOT_POSITIVE}', 'acceleratio', {step_var})")
+        self._lines.append(ctx.pad() + f"    raise ArcanaRuntimeError('{R_VERITATEM_NON_ATTIGI}', 'stationarius accelerationis')")
+        self._lines.append(ctx.pad() + f"__arcana_assert_positive('{E_LOOP_STEP_NOT_POSITIVE}', {step_var})")
 
         self._lines.append(ctx.pad() + f"while ({self._emit_expr(st.cond)}):")
         body_ctx = _EmitCtx(indent=ctx.indent + 4)
@@ -240,3 +245,16 @@ class _Transpiler:
         fn = self.BUILTINS.get(c.name, c.name)
         args = ", ".join(self._emit_expr(a) for a in c.args)
         return f"{fn}({args})"
+
+    def __arcana_verum(x):
+        if isinstance(x, bool):
+            return x
+        if isinstance(x, (int, float)):
+            return x != 0
+        if isinstance(x, str):
+            s = x.strip().lower()
+            if s in ("verum", "true", "1", "yes", "y"):
+                return True
+            if s in ("falsum", "false", "0", "no", "n", ""):
+                return False
+        return bool(x)

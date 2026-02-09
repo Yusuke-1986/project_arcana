@@ -232,7 +232,16 @@ def _sem_expr(e: A.Expr, ctx: _SemContext) -> None:
         return
 
     # unknown expr node: ignore for now
-
+_BUILTIN_ARITY = {
+    "accipere": (0, 1),
+    "longitudo": (1, 1),
+    "figura": (1, 1),
+    "indicant": (0, None),  # or (1, None)
+    "inte": (1, 1),
+    "real": (1, 1),
+    "filum": (1, 1),
+    "verum": (1, 1),
+}
 
 def _sem_call_expr(c: A.CallExpr, ctx: _SemContext) -> None:
     # Arg expressions are always valid expressions
@@ -241,4 +250,32 @@ def _sem_call_expr(c: A.CallExpr, ctx: _SemContext) -> None:
 
     # Optional: built-in / function existence and arg counts
     # Keep it off for now; can be added later when you implement function_declare/builtins table.
+    spec = _BUILTIN_ARITY.get(c.name)
+    if spec is None:
+        return
+    
+    mn, mx = spec
+    n = len(c.args)
+    if n < mn:
+        raise semantic_error(
+            code=ErrorCode.ARG_COUNT_MISMATCH,
+            message="Numeri non congruunt. Fortasse mus eos abstulit.",
+            span=c.span,
+        )
+    if mx is not None and n > mx:
+        raise semantic_error(
+            code=ErrorCode.ARG_COUNT_MISMATCH,
+            message="Numeri non congruunt. Fortasse mus eos abstulit.",
+            span=c.span,
+        )
+    if spec:
+        mn, mx = spec
+        n = len(c.args)
+        if n < mn or (mx is not None and n > mx):
+            raise semantic_error(
+                code=ErrorCode.ARG_COUNT_MISMATCH,
+                message="Numeri non congruunt. Fortasse mus eos abstulit.",
+                span=c.span,
+            )
+    
     return

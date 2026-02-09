@@ -306,6 +306,7 @@ FCON subjecto: nihil () -> {
 | `E0110_LOOP_STEP_NOT_POSITIVE` | `LOOP_STEP_NOT_POSITIVE` | `stationarius accelerationis`                      | `acceleratio` が正でない                              |
 | `E0111_LOOP_QUOTA_INVALID`     | `LOOP_QUOTA_INVALID`     | `Rectus valor, recta via`                          | `quota` が不正                                      |
 | `E0202_NIHIL_NOT_EXPR`         | `NIHIL_NOT_EXPR`         | （必要ならMSGを付与）                                       | `nihil` を式として扱った等【turn5file0†error.py†L21-L24】   |
+| `E0203_ARG_COUNT_MISMATCH` | `ARG_COUNT_MISMATCH` | `Numeri non congruunt. Fortasse mus eos abstulit.` | builtin / function の引数個数が仕様と一致しない |
 | **Parse**
 | `P0001_EXPECTED_TOKEN`           | `PARSE_EXPECTED_TOKEN`           | `Accipe {got}, pro {want} apud indicem tesserae {i}.`             | 期待したトークンと違う【turn5file0†error.py†L28-L33】                       |
 | `P0002_UNEXPECTED_TOKEN`         | `PARSE_UNEXPECTED_TOKEN`         | `Quid est hoc! Quid faciam?: {tok}`                               | 想定外トークン【turn5file0†error.py†L28-L33】                           |
