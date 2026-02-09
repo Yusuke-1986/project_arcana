@@ -6,6 +6,6 @@
 
 <DOCTRINA>
 FCON subjecto: nihil () -> {
-    indicant () <- "Hello, world!";
+    indicant () <- ("Hello, world!");
 };
 </DOCTRINA>

@@ -18,7 +18,7 @@ KEYWORDS = {
 
 # 制御用ラベル
 CONTROL_LABEL = {
-    "effigum", "proximum",
+    "effigium", "proximum",
     "et", "aut", "non", 
     "propositio", "quota", "acceleratio",
 }
@@ -38,6 +38,7 @@ TOKEN_SPEC = [
     ("DOCTED", r"</DOCTRINA>"),
     ("CMTBLKST", r"<cmt>"),
     ("CMTBLKED", r"</cmt>"),
+    ("LINECMT", r"///[^\n]*"),  # line comment (Arcana: /// ... endline)
 
     ("STRING", r'"[^"]*"|\'[^\']*\''), # ""か''のチャンク
     ("IDENT", r"[A-Za-z_][A-Za-z0-9_]*"), # チャンクで取る
@@ -52,11 +53,6 @@ TOKEN_SPEC = [
     ("EQ", r"=="),
 
     ("POW", r"\*\*"),
-
-    ("INCR", r"\+\+"),
-    ("DECR", r"--"),
-    ("PLUSEQ", r"\+="),
-    ("MINUSEQ", r"-="),
 
     ("GT", r">"),
     ("LT", r"<"),
@@ -91,7 +87,11 @@ def tokenize(src: str) -> list[Token]:
         kind=m.lastgroup
         val=m.group()
 
-        if kind=="SKIP":
+        # Normalize string literals: strip surrounding quotes
+        if kind == "STRING" and len(val) >= 2 and val[0] == val[-1] and val[0] in ("\"", "\'"):
+            val = val[1:-1]
+
+        if kind in ("SKIP", "LINECMT"):
             continue
         
         if kind == "IDENT":

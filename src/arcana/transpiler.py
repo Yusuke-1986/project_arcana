@@ -1,242 +1,219 @@
 # ========================
-# Transpiler ver.1.0
+# Transpiler ver.2.0 (AST v2 compatible)
 # ========================
+from __future__ import annotations
 
-from .ast import *
 import re
+from typing import List, Optional, Any
 
-BUILTINS={"indicant":"print", "accipere":"input", "longitudo":"len", "figura":"type"}
+from . import ast as A
 
-def emit_stmt(s,indent=0):
-    """文の変換"""
-    pad=" "*indent
 
-    if isinstance(s, Fons):
-        return []
+# Arcana built-ins -> Python built-ins
+BUILTINS = {
+    "indicant": "print",
+    "accipere": "input",
+    "longitudo": "len",
+    "figura": "type",
+}
 
-    if isinstance(s, Introductio):
-        return []
 
-    # Through
-    if isinstance(s, Through):
-        return [pad + "pass"]
+def transpile(program: A.Program) -> str:
+    """
+    Transpile Arcana AST (ast_v2) into Python source code.
 
-    # 関数(argsなし)
-    if isinstance(s,FuncDecl):
-        lines=[f"{pad}def {s.name}():"]
-        for st in s.body:
-            lines+=emit_stmt(st,indent+4)
-        return lines+[""]
+    Layout:
+      - (optional) INTRODUCTIO statements are emitted at module level
+      - DOCTRINA main becomes: def subjecto(): ...
+      - __main__ calls subjecto()
+    """
+    out: List[str] = []
 
-    # 変数
-    if isinstance(s,VarDecl):
-        return [f"{pad}{s.name} = {emit_expr(s.expr)}"]
+    # --- INTRODUCTIO: module-level initializations (VCON, etc.) ---
+    for st in program.introductio.stmts:
+        out += _emit_stmt(st, indent=0)
 
-    # 代入
-    if isinstance(s,Assign):
-        return [f"{pad}{s.name} = {emit_expr(s.expr)}"]
+    if out and out[-1] != "":
+        out.append("")  # blank line between global and function
 
-    # 式
-    if isinstance(s,ExprStmt) and isinstance(s.expr,FlowCall):
-        fn=BUILTINS.get(s.expr.call.name,s.expr.call.name)
-        return [f"{pad}{fn}({emit_expr(s.expr.arg)})"]
-    
-    # if
-    if isinstance(s, IfStmt):
-        lines=[f"{pad}if {emit_expr(s.cond)}:"]
-        for st in s.then_body:
-            lines += emit_stmt(st, indent+4)
-        lines.append(f"{pad}else:")
-        for st in s.else_body:
-            lines += emit_stmt(st, indent+4)
-        return lines
-    
-    # loop
-    if isinstance(s, RecurStmt):
-        lines = []
-        lines.append(f"{pad}__i = 0")
-        lines.append(f"{pad}__prima = {emit_expr(s.prima)}")
-        lines.append(f"{pad}while ({emit_expr(s.propositio)}) and (__i < __prima):")
-        for st in s.body:
-            lines += emit_stmt(st, indent+4)
-        lines.append(f"{pad}    {emit_acceleratio_update(s.acceleratio)}")
-        return lines
-    
-    # break
-    if isinstance(s, BreakStmt):
-        return [pad + "break"]
+    # --- DOCTRINA: subjecto() ---
+    out.append("def subjecto():")
+    body = program.doctrina.main.body
+    if not body:
+        out.append("    pass")
+    else:
+        for st in body:
+            out += _emit_stmt(st, indent=4)
 
-    # continue
-    if isinstance(s, ContinueStmt):
-        return [pad + "continue"]
-
-    raise NotImplementedError(s)
-
-def strip_line_comments(src: str) -> str:
-    out = []
-    i = 0
-    in_s = False
-    in_d = False
-    while i < len(src):
-        ch = src[i]
-
-        # 文字列の開始/終了（エスケープは最小対応）
-        if ch == "'" and not in_d:
-            # \' を雑に回避
-            if i == 0 or src[i-1] != "\\":
-                in_s = not in_s
-            out.append(ch)
-            i += 1
-            continue
-
-        if ch == '"' and not in_s:
-            if i == 0 or src[i-1] != "\\":
-                in_d = not in_d
-            out.append(ch)
-            i += 1
-            continue
-
-        # 文字列の外だけコメント扱い
-        if (not in_s and not in_d) and src.startswith("///", i):
-            # 行末まで飛ばす
-            while i < len(src) and src[i] != "\n":
-                i += 1
-            continue
-
-        out.append(ch)
-        i += 1
-
-    return "".join(out)
-
-def emit_expr(e):
-    if isinstance(e,Num):
-        return e.value
-
-    if isinstance(e,Str):
-        return e.value
-
-    if isinstance(e,Id):
-        return BUILTINS.get(e.name,e.name)
-
-    if isinstance(e, Binary) and e.op == "et":
-        return f"({emit_expr(e.left)} and {emit_expr(e.right)})"
-    
-    if isinstance(e, Binary) and e.op == "aut":
-        return f"({emit_expr(e.left)} or {emit_expr(e.right)})"
-    
-    if isinstance(e,Binary):
-        return f"({emit_expr(e.left)} {e.op} {emit_expr(e.right)})"
-    
-    if isinstance(e, Unary) and e.op == "non":
-        return f"(not {emit_expr(e.expr)})"
-
-    if isinstance(e, Cantus):
-        # e.raw は "'a=${a}'" みたいにクォート込み想定（今のtokenizerがそうなら）
-        raw = e.raw
-        if len(raw) >= 2 and raw[0] in ("'", '"') and raw[-1] == raw[0]:
-            txt = raw[1:-1]
-        else:
-            txt = raw  # 念のため
-
-        # ${expr} -> {expr} へ置換（最小実装：} までを1塊として扱う）
-        txt = re.sub(r"\$\{([^}]+)\}", r"{\1}", txt)
-
-        # f"..." を作る（reprで安全にクォート）
-        return "f" + repr(txt)
-    
-    if isinstance(e, Compare):
-        return f"({emit_expr(e.left)} {e.op.replace('><','!=')} {emit_expr(e.right)})"
-
-    raise NotImplementedError(e)
-
-def emit_acceleratio_update(g: acceleratioOpe) -> str:
-    if g.op == "++":
-        return "__i += 1"
-    if g.op == "--":
-        return "__i -= 1"
-    if g.op == "+=":
-        return f"__i += {g.value}"
-    if g.op == "-=":
-        return f"__i -= {g.value}"
-    raise ValueError(g)
-
-def has_effigum(stmts):
-    for s in stmts:
-        # 当該ループのbreak
-        if isinstance(s, BreakStmt):
-            return True
-
-        # ifの中は同一ループなので探索OK
-        if isinstance(s, IfStmt):
-            if has_effigum(s.then_body):
-                return True
-            if has_effigum(s.else_body):
-                return True
-
-        #  内側RECURSIOは別ループなので無視
-        if isinstance(s, RecurStmt):
-            continue
-
-    return False
-
-def validate_recur_guard(stmts):
-    for s in stmts:
-        if isinstance(s, RecurStmt):
-            # guardチェック（当該ループのみ）
-            if not has_effigum(s.body):
-                raise SyntaxError("RECURSIO requires effigum guard")
-
-            # 内部探索
-            validate_recur_guard(s.body)
-            continue
-
-        if isinstance(s, FuncDecl):
-            validate_recur_guard(s.body)
-            continue
-
-        if isinstance(s, IfStmt):
-            validate_recur_guard(s.then_body)
-            validate_recur_guard(s.else_body)
-            continue
-
-def validate_types(stmts):
-    for s in stmts:
-
-        if isinstance(s, VarDecl):
-
-            # propositio型チェック
-            if s.type_name == "propositio" :
-                
-                if not is_propositio_expr(s.expr):
-                    raise SyntaxError("propositio must be a boolean")
-
-        if isinstance(s, FuncDecl):
-            validate_types(s.body)
-
-        if isinstance(s, IfStmt):
-            validate_types(s.then_body)
-            validate_types(s.else_body)
-
-        if isinstance(s, RecurStmt):
-            validate_types(s.body)
-
-def is_propositio_expr(e) -> bool:
-    if isinstance(e, Compare):
-        return True
-    if isinstance(e, Unary) and e.op == "non":
-        return is_propositio_expr(e.expr)
-    if isinstance(e, Binary) and e.op in ("et", "aut"):
-        return is_propositio_expr(e.left) and is_propositio_expr(e.right)
-    # bool変数を許可するなら
-    if isinstance(e, Id):
-        return True
-    return False
-
-def transpile(ast):
-    out=[]
-    for st in ast:
-        out+=emit_stmt(st)
-
-    out.append("if __name__==\"__main__\":")
+    out.append("")
+    out.append('if __name__ == "__main__":')
     out.append("    subjecto()")
     return "\n".join(out)
+
+
+# -----------------------------
+# Statements
+# -----------------------------
+def _emit_stmt(s: A.Stmt, indent: int = 0) -> List[str]:
+    pad = " " * indent
+
+    # nihil;
+    if isinstance(s, A.NihilStmt):
+        return [pad + "pass"]
+
+    # VCON name:typ (= init)?;
+    if isinstance(s, A.VarDecl):
+        if s.init is None:
+            return [f"{pad}{s.name} = None"]
+        return [f"{pad}{s.name} = {_emit_expr(s.init)}"]
+
+    # name = expr;
+    if isinstance(s, A.Assign):
+        return [f"{pad}{s.name} = {_emit_expr(s.value)}"]
+
+    # move: dst <- src;  (Arcana move semantics: dst gets src, src cleared)
+    if isinstance(s, A.Move):
+        return [
+            f"{pad}{s.dst} = {s.src}",
+            f"{pad}{s.src} = None",
+        ]
+
+    # call statement: name() <- (args...);
+    if isinstance(s, A.CallStmt):
+        return [pad + _emit_call(s.call)]
+
+    # expr statement: expr;
+    if isinstance(s, A.ExprStmt):
+        return [pad + _emit_expr(s.expr)]
+
+    # if statement
+    if isinstance(s, A.IfStmt):
+        lines: List[str] = []
+        lines.append(f"{pad}if {_emit_expr(s.cond)}:")
+        then_body = s.then_body or []
+        if not then_body:
+            lines.append(pad + " " * 4 + "pass")
+        else:
+            for st in then_body:
+                lines += _emit_stmt(st, indent + 4)
+
+        lines.append(f"{pad}else:")
+        else_body = s.else_body or []
+        if not else_body:
+            lines.append(pad + " " * 4 + "pass")
+        else:
+            for st in else_body:
+                lines += _emit_stmt(st, indent + 4)
+
+        return lines
+
+    # loop: RECURSIO(propositio:(cond), quota:..., acceleratio:...) -> { body };
+    if isinstance(s, A.LoopStmt):
+        return _emit_loop(s, indent)
+
+    # break/continue
+    if isinstance(s, A.BreakStmt):
+        return [pad + "break"]
+
+    if isinstance(s, A.ContinueStmt):
+        return [pad + "continue"]
+
+    # ImportStmt placeholder (if added later)
+    if hasattr(A, "ImportStmt") and isinstance(s, A.ImportStmt):  # type: ignore[attr-defined]
+        # not implemented yet; safe no-op
+        return []
+
+    raise NotImplementedError(f"Transpiler: unsupported stmt node: {type(s).__name__}")
+
+
+def _emit_loop(loop: A.LoopStmt, indent: int) -> List[str]:
+    pad = " " * indent
+    lines: List[str] = []
+
+    # We use a synthetic counter __arc_i to enforce quota, independent of user vars.
+    lines.append(f"{pad}__arc_i = 0")
+
+    quota_expr = _emit_expr(loop.quota) if loop.quota is not None else "100"
+    step_expr = _emit_expr(loop.step) if loop.step is not None else "1"
+    cond_expr = _emit_expr(loop.cond)
+
+    lines.append(f"{pad}while ({cond_expr}) and (__arc_i < ({quota_expr})):")
+
+    if not loop.body:
+        lines.append(pad + " " * 4 + "pass")
+    else:
+        for st in loop.body:
+            lines += _emit_stmt(st, indent + 4)
+
+    # Increment counter at loop end
+    lines.append(f"{pad}    __arc_i += ({step_expr})")
+    return lines
+
+
+def _emit_call(c: A.CallExpr) -> str:
+    fn = BUILTINS.get(c.name, c.name)
+    args = ", ".join(_emit_expr(a) for a in c.args)
+    return f"{fn}({args})"
+
+
+# -----------------------------
+# Expressions
+# -----------------------------
+def _emit_expr(e: A.Expr) -> str:
+    # names / literals
+    if isinstance(e, A.Name):
+        return BUILTINS.get(e.id, e.id)
+
+    if isinstance(e, A.IntLit):
+        return str(e.value)
+
+    if isinstance(e, A.RealLit):
+        # keep python-friendly repr
+        return repr(e.value)
+
+    if isinstance(e, A.StringLit):
+        # safe quoting
+        return repr(e.value)
+
+    if isinstance(e, A.Paren):
+        return f"({_emit_expr(e.inner)})"
+
+    if isinstance(e, A.UnaryOp):
+        if e.op == "non":
+            return f"(not {_emit_expr(e.expr)})"
+        # fallback
+        return f"({e.op}{_emit_expr(e.expr)})"
+
+    if isinstance(e, A.BinaryOp):
+        op = _map_binop(e.op)
+        left = _emit_expr(e.left)
+        right = _emit_expr(e.right)
+        return f"({left} {op} {right})"
+
+    if isinstance(e, A.CallExpr):
+        return _emit_call(e)
+
+    # Optional future: Cantus (f-string-ish)
+    # Support both class name and attribute-based detection to avoid tight coupling.
+    if type(e).__name__ == "Cantus" or hasattr(e, "raw"):
+        raw = getattr(e, "raw", None) or getattr(e, "value", "")
+        if isinstance(raw, str):
+            txt = raw
+            # If raw already contains quotes, strip them
+            if len(txt) >= 2 and txt[0] in ("'", '"') and txt[-1] == txt[0]:
+                txt = txt[1:-1]
+            txt = re.sub(r"\$\{([^}]+)\}", r"{\1}", txt)
+            return "f" + repr(txt)
+
+    raise NotImplementedError(f"Transpiler: unsupported expr node: {type(e).__name__}")
+
+
+def _map_binop(op: str) -> str:
+    # Arcana logical ops
+    if op == "et":
+        return "and"
+    if op == "aut":
+        return "or"
+    if op == "><":
+        return "!="
+    return op

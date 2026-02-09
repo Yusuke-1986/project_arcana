@@ -1,352 +1,392 @@
-# ========================
-# Parser (minimal Pratt) ver.1.0
-# ========================
-from .ast import *
-# from types import int
+# parser_v02.py
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+from .ast import (
+    Program, FonsSection, IntroSection, DoctrinaSection, MainFunction,
+    ImportStmt,
+    Stmt, VarDecl, Assign, Move, CallStmt, ExprStmt,
+    NihilStmt, BreakStmt, ContinueStmt,
+    IfStmt, LoopStmt,
+    Expr, Name, IntLit, RealLit, StringLit, UnaryOp, BinaryOp, CallExpr, Span,Paren
+)
+
+from .error import parse_error, ErrorCode
+
+@dataclass
+class Tok:
+    kind: str
+    value: str
 
 
 class Parser:
-    def __init__(self, toks: list):
-        self.toks=toks
-        self.i=0
+    def __init__(self, toks: List[Tok]) -> None:
+        self.toks = toks
+        self.i = 0
 
-    def cur(self) -> tuple:
-        """現在位置のトークンを返す"""
+    # ---------- helpers ----------
+    def cur(self) -> Tok:
         return self.toks[self.i]
 
-    def eat(self,kind: str, val: str = None) -> tuple:
-        """トークンを返して次のインデックスを指定する"""
-        t=self.cur()
-        if t.kind!=kind or (val and t.value!=val):
-            raise SyntaxError(f"Unexpected token {t}")
-        self.i+=1
-        return t
+    def peek(self, n: int = 1) -> Tok:
+        j = self.i + n
+        return self.toks[j] if j < len(self.toks) else Tok("EOF", "")
 
-    def match(self,kind: str ,val: str = None) -> bool:
-        """該当するトークンか判別する"""
-        t=self.cur()
-        if t.kind!=kind:
+    def match(self, kind: str, value: Optional[str] = None) -> bool:
+        t = self.cur()
+        if t.kind != kind:
             return False
-        if val and t.value!=val:
+        if value is not None and t.value != value:
             return False
         return True
 
-    # ----- program -----
-
-    def parse(self) -> list:
-        body=[]
-        while not self.match("EOF"):
-            if self.match("FONSST"):
-                body.append(self.pars_fons())
-            elif self.match("INTROST"):
-                body.append(self.pars_intro())
-            elif self.match("DOCTST"):
-                self.eat("DOCTST", "<DOCTRINA>")
-                if self.match("KW","FCON"): # Topレベルからのパース
-                    body.append(self.parse_func()) # 関数定義構文の解釈
-            else:
-                self.i+=1
-        return body
-    
-    def pars_fons(self):
-        while not self.match("FONSED") and self.i<=len(self.toks):
+    def eat(self, kind: str, value: Optional[str] = None) -> Tok:
+        if not self.match(kind, value):
             t = self.cur()
-            self.i += 1
-            if self.match("FONSED"):
-                return Fons()
-            elif self.i > len(self.toks):
-                raise SyntaxError("open section error. not find \"</FONSED>\"")
-
-    def pars_intro(self):
-        while not self.match("INTROED") and self.i<=len(self.toks):
-            t = self.cur()
-            self.i += 1
-            if self.match("INTROED"):
-                return Introductio()
-            elif self.i > len(self.toks):
-                raise SyntaxError("open section error. not find \"</INTRODUCTIO>\"")
-
-    def parse_func(self) -> FuncDecl:
-        """FCON IDENT: type () -> { の判定"""
-        self.eat("KW","FCON")
-        name=self.eat("IDENT").value
-        self.eat("COLON")
+            want = f"{kind}:{value}" if value is not None else kind
+            got = f"{t.kind}:{t.value}"
+            raise parse_error(
+            ErrorCode.PARSE_EXPECTED_TOKEN,
+            f"Expected {want}, got {got} at token index {self.i}",
+            self.span0(),
+        )
         t = self.cur()
-        if t.kind == "TYPE":
-            self.i += 1
-        elif t.kind == "SP" and t.value == "nihil":
-            self.i += 1
-        else:
-            raise SyntaxError("Expected return type")
-        self.eat("LPAREN")
-        self.eat("RPAREN")
-        self.eat("DEF")
-        self.eat("LBRACE")
+        self.i += 1
+        return t
 
-        stmts=[]
-        # }閉じてない場合
-        while not self.match("RBRACE"):
+    def span0(self) -> Span:
+        # lexer側で行列を持ってないなら固定でOK。後で拡張可
+        return Span()
+
+    # ---------- entry ----------
+    def parse_program(self) -> Program:
+        fons = self.parse_fons()
+        intro = self.parse_introductio()
+        doctrina = self.parse_doctrina()
+        self.eat("EOF")
+        return Program(fons=fons, introductio=intro, doctrina=doctrina)
+
+    # ---------- sections ----------
+    def parse_fons(self) -> FonsSection:
+        self.eat("FONSST")
+        imports: List[ImportStmt] = []
+        # import grammar未確定なら、今は空でもOK。必要ならここで読み足す。
+        self.eat("FONSED")
+        return FonsSection(imports=imports)
+
+    def parse_introductio(self) -> IntroSection:
+        self.eat("INTROST")
+        stmts: List[Stmt] = []
+        while not self.match("INTROED"):
             stmts.append(self.parse_stmt())
+        self.eat("INTROED")
+        return IntroSection(stmts=stmts)
 
-        # };でちゃんと閉じたか
+    def parse_doctrina(self) -> DoctrinaSection:
+        self.eat("DOCTST")
+        main = self.parse_main()
+        self.eat("DOCTED")
+        return DoctrinaSection(main=main)
+
+    # ---------- main ----------
+    def parse_main(self) -> MainFunction:
+        # FCON subjecto: nihil () -> { ... };
+        self.eat("KW", "FCON")
+        name = self.eat("IDENT").value
+        if name != "subjecto":
+            raise parse_error(ErrorCode.PARSE_MAIN_SUBJECTO_REQUIRED, "DOCTRINA must define: FCON subjecto: nihil () -> { ... };", self.span0())
+
+        self.eat("COLON")
+        # nihil token is SP in your lexer output
+        if self.match("SP", "nihil"):
+            self.eat("SP", "nihil")
+        else:
+            raise parse_error(ErrorCode.PARSE_MAIN_NIHIL_REQUIRED, "subjecto must be typed as nihil", self.span0())
+
+        self.eat("LPAREN"); self.eat("RPAREN")
+        self.eat("DEF")  # '->'
+        self.eat("LBRACE")
+        body: List[Stmt] = []
+        while not self.match("RBRACE"):
+            body.append(self.parse_stmt())
         self.eat("RBRACE")
-        if self.match("SEMICOLON"):
-            self.eat("SEMICOLON")
+        self.eat("SEMICOLON")
+        return MainFunction(body=body)
 
-        return FuncDecl(name,stmts)
-
-    def parse_stmt(self):
+    # ---------- statements ----------
+    def parse_stmt(self) -> Stmt:
         # nihil;
         if self.match("SP", "nihil"):
             self.eat("SP", "nihil")
             self.eat("SEMICOLON")
-            return Through()
-        
-        # VCON
-        if self.match("KW","VCON"):
-            self.eat("KW","VCON")
-            name=self.eat("IDENT").value
-            self.eat("COLON")
-            # self.eat("TYPE")
-            t = self.cur()
-            if t.kind not in ("TYPE", "KW"):
-                raise SyntaxError("Expected type name")
-            type_name = t.value
-            self.i += 1
+            return NihilStmt(span=self.span0())
+
+        # effigium; / proximum;
+        if self.match("CTRL", "effigium"):
+            self.eat("CTRL", "effigium")
+            self.eat("SEMICOLON")
+            return BreakStmt(span=self.span0())
+
+        if self.match("CTRL", "proximum"):
+            self.eat("CTRL", "proximum")
+            self.eat("SEMICOLON")
+            return ContinueStmt(span=self.span0())
+
+        # VCON name:Type (= expr)?;
+        if self.match("KW", "VCON"):
+            return self.parse_vardecl()
+
+        # SI ...
+        if self.match("KW", "SI"):
+            return self.parse_if()
+
+        # RECURSIO ...
+        if self.match("KW", "RECURSIO"):
+            return self.parse_loop()
+
+        # IDENT ...  (call / move / assign / expr_stmt)
+        if self.match("IDENT"):
+            # Guard against "+=" legacy pattern: IDENT PLUS ASSIGN ...
+            if self.peek(1).kind == "PLUS" and self.peek(2).kind == "ASSIGN":
+                raise parse_error(ErrorCode.PARSE_UNSUPPORTED_SYNTAX, "'+=' is not supported in v0.2. Use: i = i + 1;", self.span0())
+
+            # call: IDENT ( ) FLOW ( args... ) ;
+            if self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
+                call = self.parse_call_expr()
+                self.eat("SEMICOLON")
+                return CallStmt(span=self.span0(), call=call)
+
+            # move: IDENT FLOW IDENT ;
+            if self.peek(1).kind == "FLOW":
+                dst = self.eat("IDENT").value
+                self.eat("FLOW")
+                if not self.match("IDENT"):
+                    raise parse_error(ErrorCode.PARSE_INVALID_MOVE, "move requires Identifier on RHS: a <- b;", self.span0())
+                src = self.eat("IDENT").value
+                self.eat("SEMICOLON")
+                return Move(span=self.span0(), dst=dst, src=src)
+
+            # assign: IDENT ASSIGN expr ;
+            if self.peek(1).kind == "ASSIGN":
+                name = self.eat("IDENT").value
+                self.eat("ASSIGN")
+                value = self.parse_expr()
+                self.eat("SEMICOLON")
+                return Assign(span=self.span0(), name=name, value=value)
+
+            # expr_stmt fallback: expr ;
+            expr = self.parse_expr()
+            self.eat("SEMICOLON")
+            return ExprStmt(span=self.span0(), expr=expr)
+
+        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Unexpected token in statement: {self.cur()}", self.span0())
+
+    def parse_vardecl(self) -> VarDecl:
+        self.eat("KW", "VCON")
+        name = self.eat("IDENT").value
+        self.eat("COLON")
+        t = self.eat("TYPE").value  # "inte" etc.
+        init = None
+        if self.match("ASSIGN"):
             self.eat("ASSIGN")
-            expr=self.parse_expr()
-            self.eat("SEMICOLON")
-            return VarDecl(name,type_name, expr)
-        
-        if self.match("CTRL","effigum"):
-            self.eat("CTRL","effigum")
-            self.eat("SEMICOLON")
-            return BreakStmt()
-
-        if self.match("CTRL","proximum"):
-            self.eat("CTRL","proximum")
-            self.eat("SEMICOLON")
-            return ContinueStmt()
-
-        # assign
-        if self.match("IDENT") and self.toks[self.i+1].kind in ("ASSIGN","PLUSEQ","MINUSEQ"):
-            name=self.eat("IDENT").value
-            op=self.cur().kind
-            self.i+=1
-            expr=self.parse_expr()
-            self.eat("SEMICOLON")
-
-            if op=="ASSIGN":
-                return Assign(name,expr)
-            if op=="PLUSEQ":
-                return Assign(name, Binary("+", Id(name), expr))
-            if op=="MINUSEQ":
-                return Assign(name, Binary("-", Id(name), expr))
-
-        if self.match("KW","SI"):
-            self.eat("KW","SI")
-            self.eat("CTRL","propositio")  # 固定語
-            self.eat("COLON")
-            self.eat("LPAREN")
-            cond = self.parse_expr()
-            self.eat("RPAREN")
-            self.eat("LBRACE")
-
-            self.eat("KW","VERUM")
-            self.eat("LBRACE")
-            then_body=[]
-            while not self.match("RBRACE"):
-                then_body.append(self.parse_stmt())
-            self.eat("RBRACE")
-
-            self.eat("KW","FALSUM")
-            self.eat("LBRACE")
-            else_body=[]
-            while not self.match("RBRACE"):
-                else_body.append(self.parse_stmt())
-            self.eat("RBRACE")
-
-            self.eat("RBRACE")
-            self.eat("SEMICOLON")
-            return IfStmt(cond, then_body, else_body)
-        
-        if self.match("KW","RECURSIO"):
-            self.eat("KW","RECURSIO")
-            self.eat("LPAREN")
-
-            # defaults
-            quota = Num("100")              # デフォルト上限
-            propositio = Num("1")             # 1==True扱い（簡易）
-            acceleratio = acceleratioOpe("++", 1)
-
-            # header: quota / propositio / acceleratio (order-free)
-            while not self.match("RPAREN"):
-                key = self.eat("CTRL").value   # "quota" | "propositio" | "acceleratio"
-                self.eat("COLON")
-
-                if key == "quota":
-                    quota = self.parse_expr()
-                elif key == "propositio":
-                    propositio = self.parse_expr()
-                    if self.contains_call(propositio):
-                        raise SyntaxError("RECURSIO propositio: function call is not allowed")
-
-                elif key == "acceleratio":
-                    acceleratio = self.parse_acceleratio_ope()
-                else:
-                    raise SyntaxError(f"Unknown RECURSIO header key: {key}")
-
-                if self.match("COMMA"):
-                    self.eat("COMMA")
-
-            self.eat("RPAREN")
-            self.eat("LBRACE")
-
-            body=[]
-            while not self.match("RBRACE"):
-                body.append(self.parse_stmt())
-
-            self.eat("RBRACE")
-            self.eat("SEMICOLON")
-            return RecurStmt(quota, propositio, acceleratio, body)
-
-        # flowcall
-        call=self.parse_call_empty()
-        self.eat("FLOW")
-
-        arg=self.parse_expr()
+            init = self.parse_expr()
         self.eat("SEMICOLON")
-        return ExprStmt(FlowCall(call,arg))
-    
-    def parse_call_empty(self):
-        name=self.eat("IDENT").value
+        return VarDecl(span=self.span0(), name=name, typ=t, init=init)
+
+    def parse_call_expr(self) -> CallExpr:
+        name = self.eat("IDENT").value
+        self.eat("LPAREN"); self.eat("RPAREN")
+        self.eat("FLOW")  # '<-'
+        args = self.parse_args_tuple_required()
+        return CallExpr(span=self.span0(), name=name, args=args)
+
+    def parse_args_tuple_required(self) -> List[Expr]:
+        # v0.2: call RHS must be "( ... )" even for single arg: ("Fizz")
         self.eat("LPAREN")
+        args: List[Expr] = []
+        if not self.match("RPAREN"):
+            args.append(self.parse_expr())
+            while self.match("COMMA"):
+                self.eat("COMMA")
+                args.append(self.parse_expr())
         self.eat("RPAREN")
-        return CallEmpty(name)
-    
-    def parse_acceleratio_ope(self) -> acceleratioOpe:
-        t = self.cur()
-        if t.kind == "INCR":
-            self.i += 1
-            return acceleratioOpe("++", 1)
-        if t.kind == "DECR":
-            self.i += 1
-            return acceleratioOpe("--", 1)
-        if t.kind == "PLUSEQ":
-            self.i += 1
-            n = int(self.eat("INT").value)
-            return acceleratioOpe("+=", n)
-        if t.kind == "MINUSEQ":
-            self.i += 1
-            n = int(self.eat("INT").value)
-            return acceleratioOpe("-=", n)
-        raise SyntaxError(f"Bad acceleratio ope token={t}")
+        return args
 
-    def contains_call(self, expr):
-        if isinstance(expr, CallEmpty):
-            return True
+    def parse_if(self) -> IfStmt:
+        # SI propositio:(cond) { VERUM{...} FALSUM{...} };
+        self.eat("KW", "SI")
+        cond = self.parse_propositio_clause()
 
-        if isinstance(expr, Binary):
-            return self.contains_call(expr.left) or self.contains_call(expr.right)
+        self.eat("LBRACE")
+        # VERUM{...}
+        self.eat("KW", "VERUM")
+        then_body = self.parse_block_stmts()
 
-        if isinstance(expr, Compare):
-            return self.contains_call(expr.left) or self.contains_call(expr.right)
+        # FALSUM{...} (required)
+        self.eat("KW", "FALSUM")
+        else_body = self.parse_block_stmts()
 
-        return False
+        self.eat("RBRACE")
+        self.eat("SEMICOLON")
+        return IfStmt(span=self.span0(), cond=cond, then_body=then_body, else_body=else_body)
 
-    # ----- expression (Pratt, stable) -----
-    def parse_expr(self, min_bp: int = 0):
-        PRECEDENCE = {
-        "**": 70,                 # right-assoc
-        "*": 60, "/": 60, "%": 60,
-        "+": 50, "-": 50,
-        "==": 40, "><": 40, ">": 40, "<": 40, ">=": 40, "<=": 40,
-        "et": 30, "aut": 20,
-        }
+    def parse_block_stmts(self) -> List[Stmt]:
+        self.eat("LBRACE")
+        stmts: List[Stmt] = []
+        while not self.match("RBRACE"):
+            stmts.append(self.parse_stmt())
+        self.eat("RBRACE")
+        return stmts
 
-        OP_MAP = {
-            "PLUS": "+",
-            "MINUS": "-",
-            "STAR": "*",
-            "SLASH": "/",
-            "PERCENT": "%",
-            "POW": "**",
-            "EQ": "==",
-            "NE": "><",
-            "GT": ">",
-            "LT": "<",
-            "GE": ">=",
-            "LE": "<="
-        }
-        t = self.cur()
+    def parse_propositio_clause(self) -> Expr:
+        # propositio : ( expr )
+        self.eat("CTRL", "propositio")
+        self.eat("COLON")
+        self.eat("LPAREN")
+        cond = self.parse_expr()
+        self.eat("RPAREN")
+        return cond
 
-        # prefix
-        if t.kind in ("INT", "REAL"):
-            self.i += 1
-            left = Num(t.value)
+    def parse_loop(self) -> LoopStmt:
+        # RECURSIO ( propositio:(cond) [, quota:expr] [, acceleratio:expr] ) -> { body } ;
+        self.eat("KW", "RECURSIO")
+        self.eat("LPAREN")
 
-        elif t.kind == "STRING":
-            self.i += 1
-            left = Str(t.value)
+        cond: Optional[Expr] = None
+        quota: Optional[Expr] = None
+        step: Optional[Expr] = None
 
-        elif t.kind == "IDENT":
-            self.i += 1
-            left = Id(t.value)
+        first = True
+        while not self.match("RPAREN"):
+            if not first:
+                self.eat("COMMA")
+            first = False
 
-        elif t.kind == "CANTUS":
-            self.i += 1
-            s = self.eat("STRING").value
-            left = Cantus(s)
+            key = self.eat("CTRL").value  # propositio/quota/acceleratio
+            self.eat("COLON")
 
-        elif t.kind == "LPAREN":
-            self.eat("LPAREN")
-            left = self.parse_expr(0)
-            self.eat("RPAREN")
-
-        elif t.kind == "KW" and t.value == "non":
-            self.i += 1
-            inner = self.parse_expr(65)   # non の優先度(適当に強め)
-            left = Unary("non", inner)
-
-        else:
-            raise SyntaxError(f"Bad expression (prefix) at token={t}")
-
-        # infix
-        while True:
-            t = self.cur()
-
-            # KW infix: et / aut
-            if t.kind == "KW" and t.value in ("et", "aut"):
-                op = t.value
-                prec = PRECEDENCE[op]
-                if prec < min_bp:
-                    break
-                self.i += 1
-                right = self.parse_expr(prec + 1)
-                left = Binary(op, left, right)
-                continue
-
-            if t.kind not in OP_MAP:
-                break
-
-            op = OP_MAP[t.kind]
-            prec = PRECEDENCE[op]
-            if prec < min_bp:
-                break
-
-            # consume operator
-            self.i += 1
-
-            # binding power:
-            # right-assoc only for **
-            next_min_bp = prec if op == "**" else prec + 1
-
-            right = self.parse_expr(next_min_bp)
-            if op in ("==", "><", ">", "<", ">=", "<="):
-                left = Compare(op, left, right)
+            if key == "propositio":
+                self.eat("LPAREN")
+                cond = self.parse_expr()
+                self.eat("RPAREN")
+            elif key == "quota":
+                quota = self.parse_expr()
+            elif key == "acceleratio":
+                step = self.parse_expr()
             else:
-                left = Binary(op, left, right)
+                raise parse_error(ErrorCode.PARSE_UNKNOWN_LOOP_HEADER, f"Unknown RECURSIO header key: {key}", self.span0())
 
-            
+        self.eat("RPAREN")
+        self.eat("DEF")  # '->' required
+        self.eat("LBRACE")
+        body: List[Stmt] = []
+        while not self.match("RBRACE"):
+            body.append(self.parse_stmt())
+        self.eat("RBRACE")
+        self.eat("SEMICOLON")
 
+        if cond is None:
+            raise parse_error(ErrorCode.PARSE_LOOP_PROPOSITIO_REQUIRED, "RECURSIO requires propositio:(...)", self.span0())
+        return LoopStmt(span=self.span0(), cond=cond, quota=quota, step=step, body=body)
+
+    # ---------- expressions (precedence climbing) ----------
+    # precedence: ** > */% > +- > comparisons > non > et > aut
+    # We implement: aut -> et -> non -> comparison -> add -> mul -> pow -> primary
+
+    def parse_expr(self) -> Expr:
+        return self.parse_or()
+
+    def parse_or(self) -> Expr:
+        left = self.parse_and()
+        while self.match("CTRL", "aut"):
+            self.eat("CTRL", "aut")
+            right = self.parse_and()
+            left = BinaryOp(span=self.span0(), op="aut", left=left, right=right)
         return left
+
+    def parse_and(self) -> Expr:
+        left = self.parse_unary()
+        while self.match("CTRL", "et"):
+            self.eat("CTRL", "et")
+            right = self.parse_unary()
+            left = BinaryOp(span=self.span0(), op="et", left=left, right=right)
+        return left
+
+    def parse_unary(self) -> Expr:
+        # { non } comparison
+        if self.match("CTRL", "non"):
+            self.eat("CTRL", "non")
+            expr = self.parse_unary()
+            return UnaryOp(span=self.span0(), op="non", expr=expr)
+        return self.parse_comparison()
+
+    def parse_comparison(self) -> Expr:
+        left = self.parse_add()
+        # allow at most one comparison (like your EBNF)
+        if self.cur().kind in ("EQ", "NE", "LT", "GT", "LE", "GE"):
+            op_tok = self.eat(self.cur().kind)
+            op_map = {"EQ": "==", "NE": "><", "LT": "<", "GT": ">", "LE": "<=", "GE": ">="}
+            op = op_map[op_tok.kind]
+            right = self.parse_add()
+            return BinaryOp(span=self.span0(), op=op, left=left, right=right)
+        return left
+
+    def parse_add(self) -> Expr:
+        left = self.parse_mul()
+        while self.cur().kind in ("PLUS", "MINUS"):
+            op_tok = self.eat(self.cur().kind)
+            op = "+" if op_tok.kind == "PLUS" else "-"
+            right = self.parse_mul()
+            left = BinaryOp(span=self.span0(), op=op, left=left, right=right)
+        return left
+
+    def parse_mul(self) -> Expr:
+        left = self.parse_pow()
+        while self.cur().kind in ("STAR", "SLASH", "PERCENT"):
+            op_tok = self.eat(self.cur().kind)
+            op = {"STAR": "*", "SLASH": "/", "PERCENT": "%"}[op_tok.kind]
+            right = self.parse_pow()
+            left = BinaryOp(span=self.span0(), op=op, left=left, right=right)
+        return left
+
+    def parse_pow(self) -> Expr:
+        left = self.parse_primary()
+        while self.match("POW"):
+            self.eat("POW")
+            right = self.parse_primary()
+            left = BinaryOp(span=self.span0(), op="**", left=left, right=right)
+        return left
+
+    def parse_primary(self) -> Expr:
+        # call_expr as expression: IDENT () <- (args_tuple)
+        if self.match("IDENT") and self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
+            return self.parse_call_expr()
+
+        if self.match("IDENT"):
+            return Name(span=self.span0(), id=self.eat("IDENT").value)
+
+        if self.match("INT"):
+            v = int(self.eat("INT").value)
+            return IntLit(span=self.span0(), value=v)
+
+        if self.match("REAL"):
+            v = float(self.eat("REAL").value)
+            return RealLit(span=self.span0(), value=v)
+
+        if self.match("STRING"):
+            s = self.eat("STRING").value
+            return StringLit(span=self.span0(), value=s)
+
+        if self.match("LPAREN"):
+            self.eat("LPAREN")
+            inner = self.parse_expr()
+            self.eat("RPAREN")
+            return Paren(span=self.span0(), inner=inner)
+
+        # prevent using nihil as expression
+        if self.match("SP", "nihil"):
+            raise parse_error(ErrorCode.PARSE_NIHIL_NOT_EXPR, "nihil is not an expression in v0.2; use 'nihil;' as a statement", self.span0())
+
+        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Unexpected token in expression: {self.cur()}", self.span0())

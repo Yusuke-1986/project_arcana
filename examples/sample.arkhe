@@ -7,23 +7,23 @@
 <DOCTRINA>
 FCON subjecto: nihil () -> {
     VCON i:inte = 1;
-    RECURSIO (propositio: (i < 101)){
+    RECURSIO (propositio: (i < 101)) -> {
         SI propositio: (i % 15 == 0){
             VERUM{
-                indicant () <- "FizzBuzz";
+                indicant () <- ("FizzBuzz");
             }
             FALSUM{
                 SI propositio: (i % 3 == 0){
                     VERUM{
-                        indicant () <- "Fizz";
+                        indicant () <- ("Fizz");
                     }
                     FALSUM{
                         SI propositio: (i % 5 == 0){
                             VERUM{
-                                indicant () <- "Buzz";
+                                indicant () <- ("Buzz");
                             }
                             FALSUM{
-                                indicant () <- i;
+                                indicant () <- (i);
                             }
                         };
                     }
@@ -31,12 +31,12 @@ FCON subjecto: nihil () -> {
             }
         };
         
-        i += 1;
+        i = i + 1;
         
         SI propositio: (i > 100){
             VERUM{
-                indicant () <- "limit over.";
-                effigum;
+                indicant () <- ("limit over.");
+                effigium;
             }
             FALSUM{
                 nihil;

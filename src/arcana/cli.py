@@ -4,10 +4,11 @@ import argparse
 
 from .lexer import *
 from .ast import *
-from .parser import Parser
 from .transpiler import *
+# import sys
 
 from datetime import datetime
+from .pipeline import compile_source
 
 VERSION = 0.2
 
@@ -28,14 +29,14 @@ def run_file(path: str, emit: bool=False, no_run: bool=False) -> None:
 
     try:
         # src = strip_line_comments(src)
-        toks = tokenize(src)
-        tr(f"TOKENS: {[(t.kind, t.value) for t in toks]}")
-        ast = Parser(toks).parse()
-        tr(f"PARSE: {ast}")
-        # sys.exit()
-        validate_recur_guard(ast)
-        validate_types(ast)
-        py = transpile(ast)
+        art = compile_source(src)
+
+        program = art.program
+        tr(f"PARSE: {program}")
+        warnings = art.warnings
+        tr(f"SEMANTIC ANALYSIS COMPLETE: Warnings={ warnings }")
+        
+        py = transpile(program)
         
         if emit:
             print("=== [arcana perscribere] transpiled python ===")

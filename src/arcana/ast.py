@@ -1,142 +1,207 @@
-# ========================
-# AST nodes ver.1.0
-# basic struct
-# ========================
+# ast_v02.py
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Optional, Union, List, Literal
+
+
+# -----------------------------
+# Source location (optional)
+# -----------------------------
+@dataclass(frozen=True)
+class Span:
+    line: int = 0
+    col: int = 0
 
 @dataclass
 class Token:
     kind: str
     value: str
 
+# -----------------------------
+# Types
+# -----------------------------
+TypeName = Literal["inte", "real", "verum", "filum", "ordinata"]
+
+
+# -----------------------------
+# Expressions
+# -----------------------------
 @dataclass
-class Fons:
-    pass
+class Expr:
+    span: Span
+
 
 @dataclass
-class Introductio:
-    pass
+class Name(Expr):
+    id: str
+
 
 @dataclass
-class Stmt: 
-    """文のブレースホルダー"""
-    pass
+class IntLit(Expr):
+    value: int
+
 
 @dataclass
-class Expr: 
-    """式のブレースホルダー"""
-    pass
+class RealLit(Expr):
+    value: float
+
 
 @dataclass
-class Num(Expr):
-    """数値"""
-    value:str
+class StringLit(Expr):
+    value: str
+
 
 @dataclass
-class Str(Expr):
-    """文字列"""
-    value:str
+class Paren(Expr):
+    inner: Expr
+
+
+BinaryOpKind = Literal[
+    "aut", "et",
+    "==", "><", "<", ">", "<=", ">=",
+    "+", "-", "*", "/", "%", "**"
+]
 
 @dataclass
-class Id(Expr):
-    """識別子"""
-    name:str
-
-@dataclass
-class Binary(Expr):
-    """
-    演算定義
-    left -> op <- right
-    """
-    op:str
-    left:Expr
-    right:Expr
-
-@dataclass
-class CallEmpty(Expr):
-    """()定義"""
-    name:str
-
-@dataclass
-class FlowCall(Expr):
-    """() <- arg 定義"""
-    call:CallEmpty
-    arg:Expr
-
-@dataclass
-class VarDecl(Stmt):
-    """変数"""
-    name:str
-    type_name: str
-    expr:Expr
-
-# = 定義
-@dataclass
-class Assign(Stmt):
-    name:str
-    expr:Expr
-
-# 式ステートメント
-@dataclass
-class ExprStmt(Stmt):
-    expr:Expr
-
-# 関数ステートメント
-@dataclass
-class FuncDecl(Stmt):
-    name:str
-    body:list
-
-# cuntusステートメント
-@dataclass
-class Cantus(Expr):
-    raw: str  # 例: 'a=${a}'
-
-# 比較
-@dataclass
-class Compare(Expr):
-    op: str
+class BinaryOp(Expr):
+    op: BinaryOpKind
     left: Expr
     right: Expr
 
-# if文
-@dataclass
-class IfStmt(Stmt):
-    cond: Expr
-    then_body: list
-    else_body: list
 
-# step
 @dataclass
-class acceleratioOpe:
-    op: str          # "++" | "--" | "+=" | "-="
-    value: int = 1   # ++/-- は 1、+=/-= は指定値
-
-# loop
-@dataclass
-class RecurStmt(Stmt):
-    prima: Expr      # まずは Expr にしておく（INTだけでもOK）
-    propositio: Expr
-    acceleratio: acceleratioOpe
-    body: list
-
-# break
-@dataclass
-class BreakStmt(Stmt):
-    pass
-
-# continue
-@dataclass
-class ContinueStmt(Stmt):
-    pass
-
-# 単項演算
-@dataclass
-class Unary(Expr):
-    op: str
+class UnaryOp(Expr):
+    op: Literal["non"]
     expr: Expr
 
-# pass
+
 @dataclass
-class Through(Stmt):
+class CallExpr(Expr):
+    """
+    Surface: Identifier () <- (args_tuple)
+    Meaning: Identifier(args...)
+    """
+    name: str
+    args: List[Expr]
+
+
+# -----------------------------
+# Statements
+# -----------------------------
+@dataclass
+class Stmt:
+    span: Span
+
+
+@dataclass
+class NihilStmt(Stmt):
+    """nihil;  -> semantic: pass"""
     pass
+
+
+@dataclass
+class BreakStmt(Stmt):
+    """effigium;  (only inside RECURSIO)"""
+    pass
+
+
+@dataclass
+class ContinueStmt(Stmt):
+    """proximum;  (only inside RECURSIO)"""
+    pass
+
+
+@dataclass
+class VarDecl(Stmt):
+    """VCON name:Type = expr;"""
+    name: str
+    typ: TypeName
+    init: Optional[Expr] = None
+
+
+@dataclass
+class Assign(Stmt):
+    """name = expr;"""
+    name: str
+    value: Expr
+
+
+@dataclass
+class Move(Stmt):
+    """dst <- src;  (src must be Identifier)"""
+    dst: str
+    src: str
+
+
+@dataclass
+class CallStmt(Stmt):
+    """call_expr;"""
+    call: CallExpr
+
+
+@dataclass
+class ExprStmt(Stmt):
+    """expr;  (keep if you want, or drop later)"""
+    expr: Expr
+
+
+@dataclass
+class IfStmt(Stmt):
+    """
+    SI propositio:(cond) { VERUM{...} FALSUM{...} };
+    FALSUM is required; do nothing => nihil;
+    """
+    cond: Expr
+    then_body: List[Stmt]
+    else_body: List[Stmt]
+
+
+@dataclass
+class LoopStmt(Stmt):
+    """
+    RECURSIO (propositio:(cond) [, quota:init_expr] [, acceleratio:step_expr]) -> { ... };
+    - quota default: 100 (semantic)
+    - step  default: +1  (semantic), step_expr must be >0 (semantic)
+    - guard exceed => runtime error "Veritatem non attigi."
+    - counter update at iteration start (after cond true, before body)
+    """
+    cond: Expr
+    quota: Optional[Expr]
+    step: Optional[Expr]
+    body: List[Stmt]
+
+
+# -----------------------------
+# Sections / Program
+# -----------------------------
+@dataclass
+class ImportStmt(Stmt):
+    raw: str
+
+
+@dataclass
+class FonsSection:
+    imports: List[ImportStmt]
+
+
+@dataclass
+class IntroSection:
+    stmts: List[Stmt]
+
+
+@dataclass
+class MainFunction:
+    body: List[Stmt]
+
+
+@dataclass
+class DoctrinaSection:
+    main: MainFunction
+
+
+@dataclass
+class Program:
+    fons: FonsSection
+    introductio: IntroSection
+    doctrina: DoctrinaSection

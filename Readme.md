@@ -41,9 +41,9 @@ Control label
 | words | intent | 意味 |
 | ----- | ----- | ----- |
 | propositio | continuous condition | (分岐するための)命題 |
-| quota | loop limit | ループ回数(デフォルト:100) |
+| quota | loop limit | 指定ループ数(デフォルト:100) |
 | acceleratio | step value | ステップ |
-| effgium | break | 脱出 |
+| effigium | break | 脱出 |
 | proximum | continue, next | 次へ |
 | non | not | ￢ |
 | et | and | ∧ |
@@ -97,17 +97,44 @@ main_section = "<DOCTRINA>", main_statement, "</DOCTRINA>" ;
 statement = variable_declare
           | function_declare
           | class_declare
+          | assign_statement
+          | move_statement
+          | call_statement
           | if_statement 
           | loop_statement 
-          | expr_stmt ;
+          | expr_stmt
+          | nihil_statement
+          | break_statement
+          | continue_statement ;
 
 inner_statement = variable_declare 
+                | assign_statement
+                | move_statement
+                | call_statement
                 | if_statement 
                 | loop_statement 
-                | expr_stmt ;
+                | expr_stmt
+                | nihil_statement
+                | break_statement
+                | continue_statement ;
+
+nihil_statement    = "nihil", ";" ;
+break_statement    = "effigium", ";" ;
+continue_statement = "proximum", ";" ;
+
+assign_statement = Identifier, "=", expr, ";" ;
+move_statement = Identifier, "<-", Identifier, ";" ;
+
+bool_expr = expr ; (* semantic: return boolean *)
+
+call_statement = call_expr, ";" ;
+call_expr = Identifier, "(", ")", "<-", args_tuple ;
+
+args_tuple = "(" , [ expr , { "," , expr } ] , ")" ;
 
 expr_stmt = expr, ";" ;
 
+(* semantic: Looping maximum level = 3 *)
 loop_statement = "RECURSIO", "(", 
                     propositio,
                      [",", quota], 
@@ -116,12 +143,25 @@ loop_statement = "RECURSIO", "(",
                 "{", { inner_statement }, "}", ";" ;
 
 propositio = "propositio", ":", "(", bool_expr, ")" ;
-bool_expr = expr ; (* semantic: return boolean *)
-quota = "quota", ":", init_expr ; (* Max loop, default = 100 *)
+
+quota = "quota", ":", init_expr ; (* budget loops, default = 100 *)
 init_expr = assignment | expr ;
 assignment = Identifier, "=", expr ;
 acceleratio = "acceleratio", ":", step_expr ; (* step value, default = counter += 1 *)
 step_expr = expr ; (* semantic: >0 *)
+
+if_statement =
+    "SI", propositio_clause,
+    "{",
+        verum_block,
+        falsum_block,
+    "}",
+    ";" ;
+
+propositio_clause = "propositio", ":", "(", bool_expr, ")" ;
+
+verum_block  = "VERUM",  "{", { inner_statement }, "}" ;
+falsum_block = "FALSUM", "{", { inner_statement }, "}" ;
 
 (* Declare *)
 main_statement = "FCON", "subjecto", ":", "nihil", "(", ")", "->", "{", { inner_statement }, "}", ";" ;
@@ -129,15 +169,21 @@ function_declare = "FCON", Identifier, ":", Type, "(", [ arg_list ], ")", "->", 
 variable_declare = "VCON", Identifier, ":", Type, ["=", expr], ";" ;
 
 (* expression *)
-expr = comparison ;
+expr = or_expr ;
+
+or_expr = and_expr, { "aut", and_expr } ;
+and_expr = unary, { "et",  unary } ;
+
+unary = { "non" }, comparison ; 
 
 comparison = add, [ ( "==" | "><" | "<" | ">" | "<=" | ">=" ), add ] ;
 add = mul, { ( "+" | "-" ), mul } ;
 mul = pow, { ( "*" | "/" | "%" ), pow } ;
-pow = postfix, { "**", postfix } ;
-postfix = primary, { "(", [ expr_list ], ")" } ;
-primary = Identifier 
+pow = primary, { "**", primary } ;
+primary = call_expr
+        | Identifier 
         | number 
+        | string
         | "(" , expr , ")" ;
 
 ```
