@@ -1,4 +1,4 @@
-# arcana programming language v0.2
+# arcana programming language v0.3
 
 ## feature
 
@@ -62,7 +62,7 @@ words: **CANTUS**, **cantus**, **nihil**
 | real | float | ----- |
 | filum | str | ----- |
 | verum | bool | ----- |
-| ordinata | tuple | taple base, but ordinata has list-like behavior |
+| ordinata | tuple | tuple base, but ordinata has list-like behavior |
 
 ### Operands
 
@@ -229,6 +229,59 @@ arcana exsecutio file.arkhe [options]
 === [arcana perscribere] end ===
 ```
 
+### example
+
+```arcana
+sample.arkhe
+<FONS>
+</FONS>
+
+<INTRODUCTIO>
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON i:inte = 1;
+    RECURSIO (propositio: (i < 51)) -> {
+        SI propositio: (i % 15 == 0){
+            VERUM{
+                indicant () <- ("FizzBuzz");
+            }
+            FALSUM{
+                SI propositio: (i % 3 == 0){
+                    VERUM{
+                        indicant () <- ("Fizz");
+                    }
+                    FALSUM{
+                        SI propositio: (i % 5 == 0){
+                            VERUM{
+                                indicant () <- ("Buzz");
+                            }
+                            FALSUM{
+                                indicant () <- (i);
+                            }
+                        };
+                    }
+                };   
+            }
+        };
+        
+        i = i + 1;
+        
+        SI propositio: (i > 100){
+            VERUM{
+                indicant () <- ("limit over.");
+                effigium;
+            }
+            FALSUM{
+                nihil;
+            }
+        };
+    };
+};
+</DOCTRINA>
+```
+
 ### built-ins
 
 | arcana | python | definition |
@@ -239,3 +292,29 @@ arcana exsecutio file.arkhe [options]
 | figura | type | figure: filum (*args) <- expr |
 | tempus | datetime.now | *** |
 | chronos | timedelta.total_seconds | *** |
+
+### Errors
+
+| Code | Name | Msg(latin) | when |
+| ----- | ----- | ----- | ----- |
+| **Runtime**
+| `R0100_VERITATEM_NON_ATTIGI` | `VERITATEM_NON_ATTIGI` | `Veritatem non attigi.` | `RECURSIO` の安全ガード quota 超過【turn5file0†error.py†L13-L14】 |
+| **Semantic**
+| `E0101_BREAK_OUTSIDE_LOOP`     | `BREAK_OUTSIDE_LOOP`     | `Nullus discessus est extra reditum.`              | ループ外で `effigium;`【turn5file0†error.py†L18-L22】   |
+| `E0102_CONTINUE_OUTSIDE_LOOP`  | `CONTINUE_OUTSIDE_LOOP`  | `Nulla continuitas extra limites est.`             | ループ外で `proximum;`【turn5file0†error.py†L18-L22】   |
+| `E0103_LOOP_NEST_TOO_DEEP`     | `LOOP_NEST_TOO_DEEP`     | `Tres reincarnationes, si plures, maledictio est.` | `RECURSIO` のネスト > 3【turn5file0†error.py†L18-L22】 |
+| `E0110_LOOP_STEP_NOT_POSITIVE` | `LOOP_STEP_NOT_POSITIVE` | `stationarius accelerationis`                      | `acceleratio` が正でない                              |
+| `E0111_LOOP_QUOTA_INVALID`     | `LOOP_QUOTA_INVALID`     | `Rectus valor, recta via`                          | `quota` が不正                                      |
+| `E0202_NIHIL_NOT_EXPR`         | `NIHIL_NOT_EXPR`         | （必要ならMSGを付与）                                       | `nihil` を式として扱った等【turn5file0†error.py†L21-L24】   |
+| **Parse**
+| `P0001_EXPECTED_TOKEN`           | `PARSE_EXPECTED_TOKEN`           | `Accipe {got}, pro {want} apud indicem tesserae {i}.`             | 期待したトークンと違う【turn5file0†error.py†L28-L33】                       |
+| `P0002_UNEXPECTED_TOKEN`         | `PARSE_UNEXPECTED_TOKEN`         | `Quid est hoc! Quid faciam?: {tok}`                               | 想定外トークン【turn5file0†error.py†L28-L33】                           |
+| `P0010_MAIN_SUBJECTO_REQUIRED`   | `PARSE_MAIN_SUBJECTO_REQUIRED`   | `Nulla scriptura sine themate est.`                               | `FCON subjecto ...` が必須【turn5file0†error.py†L30-L32】           |
+| `P0011_MAIN_NIHIL_REQUIRED`      | `PARSE_MAIN_NIHIL_REQUIRED`      | `Subiectum veritatem non dat`                                     | `subjecto: nihil` 必須【turn5file0†error.py†L30-L32】              |
+| `P0020_UNSUPPORTED_SYNTAX`       | `PARSE_UNSUPPORTED_SYNTAX`       | `'+=' is not supported in v0.3. Use: i = i + 1;`                  | 非対応構文（例 `+=`）【turn5file0†error.py†L32-L35】                     |
+| `P0021_INVALID_MOVE`             | `PARSE_INVALID_MOVE`             | `Aquam sine vase infundere non potes`                             | `a <- b;` で RHS が Identifier でない等【turn5file0†error.py†L32-L35】 |
+| `P0030_UNKNOWN_LOOP_HEADER`      | `PARSE_UNKNOWN_LOOP_HEADER`      | `Quaslibet designationes falsas firmiter repudiabimus.: {key}`    | `RECURSIO(...)` のヘッダキー不明【turn5file0†error.py†L34-L36】          |
+| `P0031_LOOP_PROPOSITIO_REQUIRED` | `PARSE_LOOP_PROPOSITIO_REQUIRED` | `Propositiones in vita necessariae sunt.`                         | `propositio:` 欠落【turn5file0†error.py†L34-L36】                  |
+| `P0040_NIHIL_NOT_EXPR`           | `PARSE_NIHIL_NOT_EXPR`           | `nihil is not an expression in v0.3; use 'nihil;' as a statement` | `nihil` の式利用禁止【turn5file0†error.py†L35-L37】                    |
+| `P0099_INTERNAL`                 | `PARSE_INTERNAL`                 | （任意）                                                              | 内部エラー/例外ラップ【turn5file0†error.py†L36-L37】                       |
+

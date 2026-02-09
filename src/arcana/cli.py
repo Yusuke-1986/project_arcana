@@ -1,4 +1,4 @@
-# arcana.py　ver.0.2
+# arcana.py　ver.0.3
 # Arcana minimal runner
 import argparse
 
@@ -10,7 +10,7 @@ from .transpiler import *
 from datetime import datetime
 from .pipeline import compile_source
 
-VERSION = 0.2
+VERSION = 0.3
 
 # --- tracing ---
 TRACE = False

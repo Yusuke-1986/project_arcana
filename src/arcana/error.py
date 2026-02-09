@@ -10,7 +10,7 @@ class ErrorCode(str, Enum):
     # -----------------------------
     # Runtime error codes
     # -----------------------------
-    VERITATEM_NON_ATTIGI = "R0100_VERITATEM_NON_ATTIGI"
+    VERITATEM_NON_ATTIGI = "R0100_LOOP_QUOTA_EXCEEDED"
 
     # -----------------------------
     # Semantic error codes

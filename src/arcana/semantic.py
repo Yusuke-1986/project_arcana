@@ -88,7 +88,7 @@ def _sem_stmt(s: A.Stmt, ctx: _SemContext) -> None:
         if ctx.loop_depth <= 0:
             raise semantic_error(
             ErrorCode.BREAK_OUTSIDE_LOOP,
-            message="effigium is only valid inside RECURSIO.",
+            message="Nullus discessus est extra reditum.",
             span=s.span,
         )
         return
@@ -97,7 +97,7 @@ def _sem_stmt(s: A.Stmt, ctx: _SemContext) -> None:
         if ctx.loop_depth <= 0:
             raise semantic_error(
             ErrorCode.CONTINUE_OUTSIDE_LOOP,
-            message="proximum is only valid inside RECURSIO.",
+            message="Nulla continuitas extra limites est.",
             span=s.span,
         )
         return
@@ -155,7 +155,7 @@ def _sem_loop_stmt(loop: A.LoopStmt, ctx: _SemContext) -> None:
     if next_depth > ctx.max_loop_depth:
         raise semantic_error(
             ErrorCode.LOOP_NEST_TOO_DEEP,
-            message=f"RECURSIO nesting exceeds max depth ({ctx.max_loop_depth}).",
+            message=f"Tres reincarnationes, si plures, maledictio est.",
             span=loop.span,
         )
 
@@ -180,7 +180,7 @@ def _sem_loop_stmt(loop: A.LoopStmt, ctx: _SemContext) -> None:
     if qv is not None and qv < 0:
         raise semantic_error(
             ErrorCode.LOOP_QUOTA_INVALID,
-            message="quota must be a non-negative integer.",
+            message="Rectus valor, recta via",
             span=loop.quota.span if hasattr(loop.quota, "span") else None,
         )
 
@@ -188,7 +188,7 @@ def _sem_loop_stmt(loop: A.LoopStmt, ctx: _SemContext) -> None:
     if sv is not None and sv <= 0:
         raise semantic_error(
             ErrorCode.LOOP_STEP_NOT_POSITIVE,
-            message="acceleratio must be > 0.",
+            message="stationarius accelerationis",
             span=loop.step.span if hasattr(loop.step, "span") else None,
         )
     # If step is non-literal expression, let runtime enforce (>0) in codegen

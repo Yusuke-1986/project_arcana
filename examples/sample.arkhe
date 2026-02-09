@@ -7,7 +7,7 @@
 <DOCTRINA>
 FCON subjecto: nihil () -> {
     VCON i:inte = 1;
-    RECURSIO (propositio: (i < 101)) -> {
+    RECURSIO (propositio: (i < 51)) -> {
         SI propositio: (i % 15 == 0){
             VERUM{
                 indicant () <- ("FizzBuzz");

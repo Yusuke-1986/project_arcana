@@ -1,219 +1,242 @@
-# ========================
-# Transpiler ver.2.0 (AST v2 compatible)
-# ========================
+# transpiler.py
 from __future__ import annotations
 
-import re
-from typing import List, Optional, Any
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from . import ast as A
+from .error import ArcanaRuntimeError, runtime_error, R_VERITATEM_NON_ATTIGI, E_LOOP_STEP_NOT_POSITIVE
 
 
-# Arcana built-ins -> Python built-ins
-BUILTINS = {
-    "indicant": "print",
-    "accipere": "input",
-    "longitudo": "len",
-    "figura": "type",
-}
-
-
+# -----------------------------
+# Public API
+# -----------------------------
 def transpile(program: A.Program) -> str:
     """
-    Transpile Arcana AST (ast_v2) into Python source code.
+    Arcana AST(v2) -> Python source.
 
-    Layout:
-      - (optional) INTRODUCTIO statements are emitted at module level
-      - DOCTRINA main becomes: def subjecto(): ...
-      - __main__ calls subjecto()
+    Design goals:
+    - Visitor-based emitter (extensible, no giant isinstance chain)
+    - Minimal runtime helpers embedded (step validation, etc.)
+    - Keep semantic meaning in semantic.py; this phase focuses on codegen.
     """
-    out: List[str] = []
-
-    # --- INTRODUCTIO: module-level initializations (VCON, etc.) ---
-    for st in program.introductio.stmts:
-        out += _emit_stmt(st, indent=0)
-
-    if out and out[-1] != "":
-        out.append("")  # blank line between global and function
-
-    # --- DOCTRINA: subjecto() ---
-    out.append("def subjecto():")
-    body = program.doctrina.main.body
-    if not body:
-        out.append("    pass")
-    else:
-        for st in body:
-            out += _emit_stmt(st, indent=4)
-
-    out.append("")
-    out.append('if __name__ == "__main__":')
-    out.append("    subjecto()")
-    return "\n".join(out)
+    t = _Transpiler()
+    return t.transpile(program)
 
 
 # -----------------------------
-# Statements
+# Emitter / Visitor
 # -----------------------------
-def _emit_stmt(s: A.Stmt, indent: int = 0) -> List[str]:
-    pad = " " * indent
+@dataclass
+class _EmitCtx:
+    indent: int = 0
 
-    # nihil;
-    if isinstance(s, A.NihilStmt):
-        return [pad + "pass"]
+    def pad(self) -> str:
+        return " " * self.indent
 
-    # VCON name:typ (= init)?;
-    if isinstance(s, A.VarDecl):
-        if s.init is None:
-            return [f"{pad}{s.name} = None"]
-        return [f"{pad}{s.name} = {_emit_expr(s.init)}"]
 
-    # name = expr;
-    if isinstance(s, A.Assign):
-        return [f"{pad}{s.name} = {_emit_expr(s.value)}"]
+class _Transpiler:
+    BUILTINS: Dict[str, str] = {
+        "indicant": "print",
+        "accipere": "input",
+        "longitudo": "len",
+        "figura": "type",
+        # future:
+        # "tempus": "...",
+        # "chronos": "...",
+    }
 
-    # move: dst <- src;  (Arcana move semantics: dst gets src, src cleared)
-    if isinstance(s, A.Move):
-        return [
-            f"{pad}{s.dst} = {s.src}",
-            f"{pad}{s.src} = None",
-        ]
+    def __init__(self) -> None:
+        self._lines: List[str] = []
+        self._loop_id: int = 0
 
-    # call statement: name() <- (args...);
-    if isinstance(s, A.CallStmt):
-        return [pad + _emit_call(s.call)]
+    # ---- main ----
+    def transpile(self, program: A.Program) -> str:
+        self._lines = []
+        self._emit_prelude()
 
-    # expr statement: expr;
-    if isinstance(s, A.ExprStmt):
-        return [pad + _emit_expr(s.expr)]
+        # FONS: imports (currently empty placeholder)
+        # INTRODUCTIO: module-level init
+        self._emit_section_intro(program.introductio)
 
-    # if statement
-    if isinstance(s, A.IfStmt):
-        lines: List[str] = []
-        lines.append(f"{pad}if {_emit_expr(s.cond)}:")
-        then_body = s.then_body or []
-        if not then_body:
-            lines.append(pad + " " * 4 + "pass")
+        # DOCTRINA: main function (subjecto)
+        self._emit_section_doctrina(program.doctrina)
+
+        # entry
+        self._lines.append('if __name__ == "__main__":')
+        self._lines.append("    subjecto()")
+        self._lines.append("")
+        return "\n".join(self._lines)
+
+    # ---- prelude ----
+    def _emit_prelude(self) -> None:
+        self._lines.append("# === [arcana transpiled python] ===")
+        self._lines.append("")
+        self._lines.append("class ArcanaRuntimeError(RuntimeError):")
+        self._lines.append("    def __init__(self, code, message):")
+        self._lines.append("        self.code = code")
+        self._lines.append("        self.message = message")
+        self._lines.append("        super().__init__(f'[{code}] {message}')")
+        self._lines.append("")
+        self._lines.append("def __arcana_assert_positive(code, name, value):")
+        self._lines.append("    if value <= 0:")
+        self._lines.append("        raise ArcanaRuntimeError(code, name + ' must be > 0.')")
+        self._lines.append("")
+        self._lines.append("")
+
+    # ---- sections ----
+    def _emit_section_intro(self, intro: A.IntroSection) -> None:
+        # Currently: just emit statements at top-level
+        for st in intro.stmts:
+            self._emit_stmt(st, _EmitCtx(indent=0))
+        if intro.stmts:
+            self._lines.append("")
+
+    def _emit_section_doctrina(self, doctrina: A.DoctrinaSection) -> None:
+        self._lines.append("def subjecto():")
+        ctx = _EmitCtx(indent=4)
+        for st in doctrina.main.body:
+            self._emit_stmt(st, ctx)
+        if not doctrina.main.body:
+            self._lines.append("    pass")
+        self._lines.append("")
+
+    # ---- stmt dispatch ----
+    def _emit_stmt(self, st: A.Stmt, ctx: _EmitCtx) -> None:
+        fn = getattr(self, f"_stmt_{type(st).__name__}", None)
+        if fn is None:
+            raise NotImplementedError(f"Transpiler missing stmt handler for: {type(st).__name__}")
+        fn(st, ctx)
+
+    def _stmt_NihilStmt(self, st: A.NihilStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + "pass")
+
+    def _stmt_VarDecl(self, st: A.VarDecl, ctx: _EmitCtx) -> None:
+        if st.init is None:
+            self._lines.append(ctx.pad() + f"{st.name} = None")
         else:
-            for st in then_body:
-                lines += _emit_stmt(st, indent + 4)
+            self._lines.append(ctx.pad() + f"{st.name} = {self._emit_expr(st.init)}")
 
-        lines.append(f"{pad}else:")
-        else_body = s.else_body or []
-        if not else_body:
-            lines.append(pad + " " * 4 + "pass")
+    def _stmt_Assign(self, st: A.Assign, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + f"{st.name} = {self._emit_expr(st.value)}")
+
+    def _stmt_Move(self, st: A.Move, ctx: _EmitCtx) -> None:
+        # move semantics (Arcana idea): dst gets src, src cleared
+        self._lines.append(ctx.pad() + f"{st.dst} = {st.src}")
+        self._lines.append(ctx.pad() + f"{st.src} = None")
+
+    def _stmt_CallStmt(self, st: A.CallStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + self._emit_call_expr(st.call))
+
+    def _stmt_ExprStmt(self, st: A.ExprStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + self._emit_expr(st.expr))
+
+    def _stmt_BreakStmt(self, st: A.BreakStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + "break")
+
+    def _stmt_ContinueStmt(self, st: A.ContinueStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + "continue")
+
+    def _stmt_IfStmt(self, st: A.IfStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + f"if {self._emit_expr(st.cond)}:")
+        then_ctx = _EmitCtx(indent=ctx.indent + 4)
+        if st.then_body:
+            for s in st.then_body:
+                self._emit_stmt(s, then_ctx)
         else:
-            for st in else_body:
-                lines += _emit_stmt(st, indent + 4)
+            self._lines.append(then_ctx.pad() + "pass")
 
-        return lines
+        self._lines.append(ctx.pad() + "else:")
+        else_ctx = _EmitCtx(indent=ctx.indent + 4)
+        if st.else_body:
+            for s in st.else_body:
+                self._emit_stmt(s, else_ctx)
+        else:
+            self._lines.append(else_ctx.pad() + "pass")
 
-    # loop: RECURSIO(propositio:(cond), quota:..., acceleratio:...) -> { body };
-    if isinstance(s, A.LoopStmt):
-        return _emit_loop(s, indent)
+    def _stmt_LoopStmt(self, st: A.LoopStmt, ctx: _EmitCtx) -> None:
+        self._loop_id += 1
+        lid = self._loop_id
+        ctr_var = f"__arc_ctr_{lid}"
+        quota_var = f"__arc_quota_{lid}"
+        step_var = f"__arc_step_{lid}"
 
-    # break/continue
-    if isinstance(s, A.BreakStmt):
-        return [pad + "break"]
+        quota_expr = self._emit_expr(st.quota) if st.quota is not None else "100"
+        step_expr = self._emit_expr(st.step) if st.step is not None else "1"
 
-    if isinstance(s, A.ContinueStmt):
-        return [pad + "continue"]
+        self._lines.append(ctx.pad() + f"{ctr_var} = 0")
+        self._lines.append(ctx.pad() + f"{quota_var} = {quota_expr}")
+        self._lines.append(ctx.pad() + f"{step_var} = {step_expr}")
 
-    # ImportStmt placeholder (if added later)
-    if hasattr(A, "ImportStmt") and isinstance(s, A.ImportStmt):  # type: ignore[attr-defined]
-        # not implemented yet; safe no-op
-        return []
+        # runtime validations (dynamic expr 対応)
+        self._lines.append(ctx.pad() + f"if {quota_var} < 0:")
+        self._lines.append(ctx.pad() + f"    raise ArcanaRuntimeError('{R_VERITATEM_NON_ATTIGI}', 'quota must be >= 0.')")
+        self._lines.append(ctx.pad() + f"__arcana_assert_positive('{E_LOOP_STEP_NOT_POSITIVE}', 'acceleratio', {step_var})")
 
-    raise NotImplementedError(f"Transpiler: unsupported stmt node: {type(s).__name__}")
+        self._lines.append(ctx.pad() + f"while ({self._emit_expr(st.cond)}):")
+        body_ctx = _EmitCtx(indent=ctx.indent + 4)
 
+        # guard + counter update at iteration start (cond True の反復に入った直後)
+        self._lines.append(body_ctx.pad() + f"if {ctr_var} >= {quota_var}:")
+        self._lines.append(body_ctx.pad() + f"    raise ArcanaRuntimeError('{R_VERITATEM_NON_ATTIGI}', 'Veritatem non attigi.')")
+        self._lines.append(body_ctx.pad() + f"{ctr_var} += {step_var}")
 
-def _emit_loop(loop: A.LoopStmt, indent: int) -> List[str]:
-    pad = " " * indent
-    lines: List[str] = []
+        if st.body:
+            for s in st.body:
+                self._emit_stmt(s, body_ctx)
+        else:
+            self._lines.append(body_ctx.pad() + "pass")
 
-    # We use a synthetic counter __arc_i to enforce quota, independent of user vars.
-    lines.append(f"{pad}__arc_i = 0")
+    # ---- expr dispatch ----
+    def _emit_expr(self, e: A.Expr) -> str:
+        fn = getattr(self, f"_expr_{type(e).__name__}", None)
+        if fn is None:
+            raise NotImplementedError(f"Transpiler missing expr handler for: {type(e).__name__}")
+        return fn(e)
 
-    quota_expr = _emit_expr(loop.quota) if loop.quota is not None else "100"
-    step_expr = _emit_expr(loop.step) if loop.step is not None else "1"
-    cond_expr = _emit_expr(loop.cond)
+    def _expr_Name(self, e: A.Name) -> str:
+        return e.id
 
-    lines.append(f"{pad}while ({cond_expr}) and (__arc_i < ({quota_expr})):")
-
-    if not loop.body:
-        lines.append(pad + " " * 4 + "pass")
-    else:
-        for st in loop.body:
-            lines += _emit_stmt(st, indent + 4)
-
-    # Increment counter at loop end
-    lines.append(f"{pad}    __arc_i += ({step_expr})")
-    return lines
-
-
-def _emit_call(c: A.CallExpr) -> str:
-    fn = BUILTINS.get(c.name, c.name)
-    args = ", ".join(_emit_expr(a) for a in c.args)
-    return f"{fn}({args})"
-
-
-# -----------------------------
-# Expressions
-# -----------------------------
-def _emit_expr(e: A.Expr) -> str:
-    # names / literals
-    if isinstance(e, A.Name):
-        return BUILTINS.get(e.id, e.id)
-
-    if isinstance(e, A.IntLit):
+    def _expr_IntLit(self, e: A.IntLit) -> str:
         return str(e.value)
 
-    if isinstance(e, A.RealLit):
-        # keep python-friendly repr
+    def _expr_RealLit(self, e: A.RealLit) -> str:
         return repr(e.value)
 
-    if isinstance(e, A.StringLit):
-        # safe quoting
+    def _expr_StringLit(self, e: A.StringLit) -> str:
+        # lexer strips quotes already; emit Python string literal safely
         return repr(e.value)
 
-    if isinstance(e, A.Paren):
-        return f"({_emit_expr(e.inner)})"
+    def _expr_Paren(self, e: A.Paren) -> str:
+        return f"({self._emit_expr(e.inner)})"
 
-    if isinstance(e, A.UnaryOp):
+    def _expr_UnaryOp(self, e: A.UnaryOp) -> str:
         if e.op == "non":
-            return f"(not {_emit_expr(e.expr)})"
-        # fallback
-        return f"({e.op}{_emit_expr(e.expr)})"
+            return f"(not {self._emit_expr(e.expr)})"
+        if e.op == "+":
+            return f"(+{self._emit_expr(e.expr)})"
+        if e.op == "-":
+            return f"(-{self._emit_expr(e.expr)})"
+        return f"({e.op}{self._emit_expr(e.expr)})"
 
-    if isinstance(e, A.BinaryOp):
-        op = _map_binop(e.op)
-        left = _emit_expr(e.left)
-        right = _emit_expr(e.right)
-        return f"({left} {op} {right})"
+    def _expr_BinaryOp(self, e: A.BinaryOp) -> str:
+        # logical ops are in Arcana words
+        if e.op == "et":
+            return f"({self._emit_expr(e.left)} and {self._emit_expr(e.right)})"
+        if e.op == "aut":
+            return f"({self._emit_expr(e.left)} or {self._emit_expr(e.right)})"
+        # NE token maps to "><" in parser; python is "!="
+        if e.op == "><":
+            op = "!="
+        else:
+            op = e.op
+        return f"({self._emit_expr(e.left)} {op} {self._emit_expr(e.right)})"
 
-    if isinstance(e, A.CallExpr):
-        return _emit_call(e)
+    def _expr_CallExpr(self, e: A.CallExpr) -> str:
+        return self._emit_call_expr(e)
 
-    # Optional future: Cantus (f-string-ish)
-    # Support both class name and attribute-based detection to avoid tight coupling.
-    if type(e).__name__ == "Cantus" or hasattr(e, "raw"):
-        raw = getattr(e, "raw", None) or getattr(e, "value", "")
-        if isinstance(raw, str):
-            txt = raw
-            # If raw already contains quotes, strip them
-            if len(txt) >= 2 and txt[0] in ("'", '"') and txt[-1] == txt[0]:
-                txt = txt[1:-1]
-            txt = re.sub(r"\$\{([^}]+)\}", r"{\1}", txt)
-            return "f" + repr(txt)
-
-    raise NotImplementedError(f"Transpiler: unsupported expr node: {type(e).__name__}")
-
-
-def _map_binop(op: str) -> str:
-    # Arcana logical ops
-    if op == "et":
-        return "and"
-    if op == "aut":
-        return "or"
-    if op == "><":
-        return "!="
-    return op
+    # ---- call ----
+    def _emit_call_expr(self, c: A.CallExpr) -> str:
+        fn = self.BUILTINS.get(c.name, c.name)
+        args = ", ".join(self._emit_expr(a) for a in c.args)
+        return f"{fn}({args})"

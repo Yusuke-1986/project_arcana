@@ -1,0 +1,16 @@
+<FONS>
+</FONS>
+
+<INTRODUCTIO>
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON ans: inte = 1;
+    RECURSIO (propositio: (ans >< 10)) -> {
+        ans = ans + 1;
+        indicant () <- ("current");
+        indicant () <- (ans);
+    };
+};
+</DOCTRINA>

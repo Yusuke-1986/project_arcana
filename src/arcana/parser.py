@@ -1,4 +1,4 @@
-# parser_v02.py
+# parser.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -49,7 +49,7 @@ class Parser:
             got = f"{t.kind}:{t.value}"
             raise parse_error(
             ErrorCode.PARSE_EXPECTED_TOKEN,
-            f"Expected {want}, got {got} at token index {self.i}",
+            f"Accipe {got}, pro {want} apud indicem tesserae {self.i}.",
             self.span0(),
         )
         t = self.cur()
@@ -96,14 +96,14 @@ class Parser:
         self.eat("KW", "FCON")
         name = self.eat("IDENT").value
         if name != "subjecto":
-            raise parse_error(ErrorCode.PARSE_MAIN_SUBJECTO_REQUIRED, "DOCTRINA must define: FCON subjecto: nihil () -> { ... };", self.span0())
+            raise parse_error(ErrorCode.PARSE_MAIN_SUBJECTO_REQUIRED, "Nulla scriptura sine themate est.", self.span0())
 
         self.eat("COLON")
         # nihil token is SP in your lexer output
         if self.match("SP", "nihil"):
             self.eat("SP", "nihil")
         else:
-            raise parse_error(ErrorCode.PARSE_MAIN_NIHIL_REQUIRED, "subjecto must be typed as nihil", self.span0())
+            raise parse_error(ErrorCode.PARSE_MAIN_NIHIL_REQUIRED, "Subiectum veritatem non dat.", self.span0())
 
         self.eat("LPAREN"); self.eat("RPAREN")
         self.eat("DEF")  # '->'
@@ -150,7 +150,7 @@ class Parser:
         if self.match("IDENT"):
             # Guard against "+=" legacy pattern: IDENT PLUS ASSIGN ...
             if self.peek(1).kind == "PLUS" and self.peek(2).kind == "ASSIGN":
-                raise parse_error(ErrorCode.PARSE_UNSUPPORTED_SYNTAX, "'+=' is not supported in v0.2. Use: i = i + 1;", self.span0())
+                raise parse_error(ErrorCode.PARSE_UNSUPPORTED_SYNTAX, "'+=' is not supported in v0.3. Use: i = i + 1;", self.span0())
 
             # call: IDENT ( ) FLOW ( args... ) ;
             if self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
@@ -163,7 +163,7 @@ class Parser:
                 dst = self.eat("IDENT").value
                 self.eat("FLOW")
                 if not self.match("IDENT"):
-                    raise parse_error(ErrorCode.PARSE_INVALID_MOVE, "move requires Identifier on RHS: a <- b;", self.span0())
+                    raise parse_error(ErrorCode.PARSE_INVALID_MOVE, "Aquam sine vase infundere non potes", self.span0())
                 src = self.eat("IDENT").value
                 self.eat("SEMICOLON")
                 return Move(span=self.span0(), dst=dst, src=src)
@@ -181,7 +181,7 @@ class Parser:
             self.eat("SEMICOLON")
             return ExprStmt(span=self.span0(), expr=expr)
 
-        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Unexpected token in statement: {self.cur()}", self.span0())
+        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Quid est hoc! Quid faciam?: {self.cur()}", self.span0())
 
     def parse_vardecl(self) -> VarDecl:
         self.eat("KW", "VCON")
@@ -203,7 +203,7 @@ class Parser:
         return CallExpr(span=self.span0(), name=name, args=args)
 
     def parse_args_tuple_required(self) -> List[Expr]:
-        # v0.2: call RHS must be "( ... )" even for single arg: ("Fizz")
+        # v0.3: call RHS must be "( ... )" even for single arg: ("Fizz")
         self.eat("LPAREN")
         args: List[Expr] = []
         if not self.match("RPAREN"):
@@ -276,7 +276,7 @@ class Parser:
             elif key == "acceleratio":
                 step = self.parse_expr()
             else:
-                raise parse_error(ErrorCode.PARSE_UNKNOWN_LOOP_HEADER, f"Unknown RECURSIO header key: {key}", self.span0())
+                raise parse_error(ErrorCode.PARSE_UNKNOWN_LOOP_HEADER, f"Quaslibet designationes falsas firmiter repudiabimus.: {key}", self.span0())
 
         self.eat("RPAREN")
         self.eat("DEF")  # '->' required
@@ -288,7 +288,7 @@ class Parser:
         self.eat("SEMICOLON")
 
         if cond is None:
-            raise parse_error(ErrorCode.PARSE_LOOP_PROPOSITIO_REQUIRED, "RECURSIO requires propositio:(...)", self.span0())
+            raise parse_error(ErrorCode.PARSE_LOOP_PROPOSITIO_REQUIRED, "Propositiones in vita necessariae sunt.", self.span0())
         return LoopStmt(span=self.span0(), cond=cond, quota=quota, step=step, body=body)
 
     # ---------- expressions (precedence climbing) ----------
@@ -387,6 +387,6 @@ class Parser:
 
         # prevent using nihil as expression
         if self.match("SP", "nihil"):
-            raise parse_error(ErrorCode.PARSE_NIHIL_NOT_EXPR, "nihil is not an expression in v0.2; use 'nihil;' as a statement", self.span0())
+            raise parse_error(ErrorCode.PARSE_NIHIL_NOT_EXPR, "nihil is not an expression in v0.3; use 'nihil;' as a statement", self.span0())
 
-        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Unexpected token in expression: {self.cur()}", self.span0())
+        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Caerimoniae Sinice haberi non possunt.: {self.cur()}", self.span0())
