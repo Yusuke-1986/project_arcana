@@ -10,7 +10,7 @@ from .transpiler import *
 from datetime import datetime
 from .pipeline import compile_source
 
-VERSION = 0.3
+VERSION = "0.3.5"
 
 # --- tracing ---
 TRACE = False
@@ -72,6 +72,7 @@ def main(argv=None) -> int:
     args = ap.parse_args()
 
     print(f"arcana: python transpiler ver v.{VERSION}")
+    print("")
     
     if args.cmd == "exsecutio": # exsecutioあれば実行
         start = datetime.now()
