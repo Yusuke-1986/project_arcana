@@ -27,34 +27,3 @@ postfix
 a
 a( expr_list, ... )
 a()() ...
-
-ErrorCode.BREAK_OUTSIDE_LOOP,
-message="Nullus discessus est extra reditum.",
-ErrorCode.CONTINUE_OUTSIDE_LOOP,
-message="Nulla continuitas extra limites est.",
-ErrorCode.LOOP_NEST_TOO_DEEP,
-message=f"Tres reincarnationes, si plures, maledictio est.",
-ErrorCode.LOOP_QUOTA_INVALID,
-message="Rectus valor, recta via",
-ErrorCode.LOOP_STEP_NOT_POSITIVE,
-message="stationarius accelerationis",
-ErrorCode.PARSE_EXPECTED_TOKEN,
-f"Accipe {got}, pro {want} apud indicem tesserae {self.i}.",
-ErrorCode.PARSE_MAIN_SUBJECTO_REQUIRED,
-"Nulla scriptura sine themate est."
-ErrorCode.PARSE_MAIN_NIHIL_REQUIRED, 
-"Subiectum veritatem non dat"
-ErrorCode.PARSE_UNSUPPORTED_SYNTAX, 
-"'+=' is not supported in v0.3. Use: i = i + 1;"
-ErrorCode.PARSE_INVALID_MOVE, 
-"Aquam sine vase infundere non potes"
-ErrorCode.PARSE_UNEXPECTED_TOKEN,
-f"Quid est hoc! Quid faciam?: {self.cur()}"
-ErrorCode.PARSE_UNKNOWN_LOOP_HEADER, 
-f"Quaslibet designationes falsas firmiter repudiabimus.: {key}"
-ErrorCode.PARSE_LOOP_PROPOSITIO_REQUIRED, 
-"Propositiones in vita necessariae sunt."
-ErrorCode.PARSE_NIHIL_NOT_EXPR, 
-"nihil is not an expression in v0.3; use 'nihil;' as a statement"
-ErrorCode.PARSE_UNEXPECTED_TOKEN, 
-f"Caerimoniae Sinice haberi non possunt.: {self.cur()}"

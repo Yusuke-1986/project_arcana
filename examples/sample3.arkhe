@@ -6,11 +6,9 @@
 
 <DOCTRINA>
 FCON subjecto: nihil () -> {
-    VCON s:filum = accipere() <- ("name? ");
+    VCON s:filum = accipere() <- ("name? >");
     indicant() <- (s);
-    VCON n:filum = accipere() <- ("number? ");
+    VCON n:inte = inte() <- (accipere() <- ("number? >"));
     indicant() <- (n*2);
-    VCON conv_n:inte = inte() <- (n);
-    indicant() <- (conv_n*2);
 };
 </DOCTRINA>

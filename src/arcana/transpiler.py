@@ -75,8 +75,6 @@ class _Transpiler:
 
     # ---- prelude ----
     def _emit_prelude(self) -> None:
-        # self._lines.append("# === [arcana transpiled python] ===")
-        # self._lines.append("")
         self._lines.append("class ArcanaRuntimeError(RuntimeError):")
         self._lines.append("    def __init__(self, code, message):")
         self._lines.append("        self.code = code")

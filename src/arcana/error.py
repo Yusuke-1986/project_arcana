@@ -22,6 +22,7 @@ class ErrorCode(str, Enum):
     LOOP_QUOTA_INVALID = "E0111_LOOP_QUOTA_INVALID"
     NIHIL_NOT_EXPR = "E0202_NIHIL_NOT_EXPR"
     ARG_COUNT_MISMATCH = "E0203_ARG_COUNT_MISMATCH"
+    TYPE_MISMATCH = "E0204_TYPE_MISMATCH"
 
     # -----------------------------
     # Parse error codes
