@@ -1,0 +1,11 @@
+<FONS></FONS>
+<INTRODUCTIO></INTRODUCTIO>
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON i:inte = 3;
+    VCON xs: ordinata = ordinata() <- (1, 2, 3, i);
+
+    indicant () <- (figura() <- (xs));
+    indicant () <- (longitudo() <- (xs));
+};
+</DOCTRINA>

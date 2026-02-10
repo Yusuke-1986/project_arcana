@@ -35,7 +35,7 @@ def run_file(path: str, emit: bool=False, no_run: bool=False) -> None:
         tr(f"PARSE: {program}")
         warnings = art.warnings
         tr(f"SEMANTIC ANALYSIS COMPLETE: Warnings={ warnings }")
-        
+        # sys.exit()
         py = transpile(program)
         
         if emit:

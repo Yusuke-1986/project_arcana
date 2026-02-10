@@ -1,0 +1,12 @@
+<FONS></FONS>
+<INTRODUCTIO></INTRODUCTIO>
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    indicant () <- (figura() <- (3));
+    indicant () <- (figura() <- ("a"));
+    indicant () <- (figura() <- (cantus'test'));
+    indicant () <- (figura() <- (ordinata() <- (1, 2, 3)));
+    indicant () <- (figura() <- ([1, 2, 3]));
+    indicant () <- (figura() <- ({"a": 4}));
+};
+</DOCTRINA>

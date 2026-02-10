@@ -1,0 +1,12 @@
+<FONS>
+</FONS>
+
+<INTRODUCTIO>
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON i:inte = 7;
+    indicant () <- (cantus 'i = {i}');
+};
+</DOCTRINA>

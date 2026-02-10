@@ -51,6 +51,9 @@ class RealLit(Expr):
 class StringLit(Expr):
     value: str
 
+@dataclass
+class CantusLit(Expr):
+    template: str
 
 @dataclass
 class Paren(Expr):

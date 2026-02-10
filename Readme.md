@@ -286,12 +286,12 @@ FCON subjecto: nihil () -> {
 
 | arcana | python | definition |
 | ----- | ----- | ----- |
-| indicant | print | indicant: filum (*objects, sep=' ', end='\n', file=sys.stdout, flush=False) <- expr |
-| accipere | input | accipere: filum (*args) <- expr |
-| longitudo | len | longitude: inte (*args) <- expr |
-| figura | type | figure: filum (*args) <- expr |
-| tempus | datetime.now | *** |
-| chronos | timedelta.total_seconds | *** |
+| indicant | print | indicant: filum () <- (expr) |
+| accipere | input | accipere: filum () <- (expr) |
+| longitudo | len | longitude: inte () <- (expr) |
+| figura | type | figure: arcana_type () <- (expr) |
+| tempus | (pending)datetime.now | TBD |
+| chronos | (pending)timedelta.total_seconds | TBD |
 
 ### Errors
 

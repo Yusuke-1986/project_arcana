@@ -31,6 +31,7 @@ def compile_source(src: str, *, max_loop_depth: int = 3) -> CompileArtifacts:
     """
     try:
         toks = tokenize(src)
+        # print(f"[arcana: pipeline] tokens = {toks}")
         program = Parser(toks).parse_program()
         sem: SemanticResult = analyze(program, max_loop_depth=max_loop_depth)
         return CompileArtifacts(program=sem.program, warnings=sem.warnings)

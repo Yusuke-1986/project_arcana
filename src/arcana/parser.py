@@ -10,7 +10,8 @@ from .ast import (
     Stmt, VarDecl, Assign, Move, CallStmt, ExprStmt,
     NihilStmt, BreakStmt, ContinueStmt,
     IfStmt, LoopStmt,
-    Expr, Name, IntLit, RealLit, StringLit, UnaryOp, BinaryOp, CallExpr, Span,Paren
+    Expr, Name, IntLit, RealLit, StringLit, CantusLit, 
+    UnaryOp, BinaryOp, CallExpr, Span,Paren
 )
 
 from .error import parse_error, ErrorCode
@@ -390,6 +391,17 @@ class Parser:
             inner = self.parse_expr()
             self.eat("RPAREN")
             return Paren(span=self.span0(), inner=inner)
+        
+        if self.match("CANTUS"):
+            t = self.eat("CANTUS")  # 'cantus'
+            if not self.match("STRING"):
+                raise parse_error(
+                    ErrorCode.PARSE_EXPECTED_TOKEN,
+                    "Cantus requirit filum.",
+                    self.span0(),
+                )
+            template = self.eat("STRING").value
+            return CantusLit(span=t.span if hasattr(t, "span") else self.span0(), template=template)
 
         # prevent using nihil as expression
         if self.match("SP", "nihil"):

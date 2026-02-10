@@ -40,7 +40,7 @@ class _Transpiler:
         "indicant": "print",
         "accipere": "input",
         "longitudo": "len",
-        "figura": "type",
+        "figura": "__arcana_figura",
         # future:
         # "tempus": "...",
         # "chronos": "...",
@@ -48,6 +48,7 @@ class _Transpiler:
         "inte": "int",
         "real": "float",
         "filum": "str",
+        "ordinata": "tuple",
         "verum": "__arcana_verum",
     }
 
@@ -85,6 +86,22 @@ class _Transpiler:
         self._lines.append("    if value <= 0:")
         self._lines.append("        raise ArcanaRuntimeError(code, 'stationarius accelerationis')")
         self._lines.append("")
+        self._lines.append("")
+
+        self._lines.append("def __arcana_figura(x):")
+        self._lines.append("    if isinstance(x, bool):")
+        self._lines.append("        return 'verum'")
+        self._lines.append("    if x is None:")
+        self._lines.append("        return 'nihil'")
+        self._lines.append("    if isinstance(x, int):")
+        self._lines.append("        return 'inte'")
+        self._lines.append("    if isinstance(x, float):")
+        self._lines.append("        return 'real'")
+        self._lines.append("    if isinstance(x, str):")
+        self._lines.append("        return 'filum'")
+        self._lines.append("    if isinstance(x, tuple):")
+        self._lines.append("        return 'ordinata'")
+        self._lines.append("    return f'{type(x).__name__}_python_originis'")
         self._lines.append("")
 
     # ---- sections ----
@@ -210,6 +227,12 @@ class _Transpiler:
         # lexer strips quotes already; emit Python string literal safely
         return repr(e.value)
 
+    def _expr_CantusLit(self, e: A.CantusLit) -> str:
+        # Arcana cantus'...': emit as Python f-string.
+        # lexer already stripped quotes, so e.template is raw content.
+        # Use repr to safely quote, then prefix with f.
+        return "f" + repr(e.template)
+
     def _expr_Paren(self, e: A.Paren) -> str:
         return f"({self._emit_expr(e.inner)})"
 
@@ -240,6 +263,16 @@ class _Transpiler:
 
     # ---- call ----
     def _emit_call_expr(self, c: A.CallExpr) -> str:
+        # Special: ordinata(...) should become a Python tuple literal,
+        # because tuple(a,b,c) is invalid (tuple takes 0 or 1 arg).
+        if c.name == "ordinata":
+            if len(c.args) == 0:
+                return "()"
+            if len(c.args) == 1:
+                return f"({self._emit_expr(c.args[0])},)"
+            inner = ", ".join(self._emit_expr(a) for a in c.args)
+            return f"({inner})"
+        
         fn = self.BUILTINS.get(c.name, c.name)
         args = ", ".join(self._emit_expr(a) for a in c.args)
         return f"{fn}({args})"

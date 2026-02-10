@@ -275,6 +275,7 @@ _BUILTIN_ARITY = {
     "inte": (1, 1),
     "real": (1, 1),
     "filum": (1, 1),
+    "ordinata": (0, None), # 可変長引数扱い
     "verum": (1, 1),
 }
 
@@ -325,6 +326,7 @@ def infer_expr_type(e, env) -> str | None:
             "inte": "inte",
             "real": "real",
             "filum": "filum",
+            "ordinata": "ordinata",
             "verum": "verum",
             "indicant": "nihil",
         }.get(e.name)
