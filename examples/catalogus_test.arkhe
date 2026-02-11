@@ -1,0 +1,13 @@
+<FONS>
+</FONS>
+
+<INTRODUCTIO>
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON d: catalogus = {"a": 4, "b": 5};
+    indicant () <- (figura() <- (d));
+    indicant () <- (d["a"]);
+};
+</DOCTRINA>

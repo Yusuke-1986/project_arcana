@@ -7,5 +7,7 @@ FCON subjecto: nihil () -> {
 
     indicant () <- (figura() <- (xs));
     indicant () <- (longitudo() <- (xs));
+
+    indicant () <- (xs[2]);
 };
 </DOCTRINA>

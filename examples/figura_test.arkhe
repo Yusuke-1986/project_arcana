@@ -2,11 +2,24 @@
 <INTRODUCTIO></INTRODUCTIO>
 <DOCTRINA>
 FCON subjecto: nihil () -> {
-    indicant () <- (figura() <- (3));
-    indicant () <- (figura() <- ("a"));
-    indicant () <- (figura() <- (cantus'test'));
-    indicant () <- (figura() <- (ordinata() <- (1, 2, 3)));
-    indicant () <- (figura() <- ([1, 2, 3]));
-    indicant () <- (figura() <- ({"a": 4}));
+    VCON o: ordinata = ordinata() <- (1, 2, 3);
+    VCON c: catalogus = {"a": 4};
+
+    VCON integer:filum = figura() <- (3);
+    VCON strings:filum = figura() <- ("a");
+    VCON cantus_phrase:filum = figura() <- (cantus'test');
+    VCON ordifig:filum = figura() <- (o);
+    VCON ordidxfig:filum = figura() <- (o[0]);
+    VCON catalogfig:filum = figura() <- (c);
+    VCON catakeyfig:filum = figura() <- (c["a"]);
+
+    indicant () <- (cantus'3 is {integer}');
+    indicant () <- (cantus'"a" is {strings}');
+    indicant () <- (cantus'cantus_phrase is {cantus_phrase}');
+    indicant () <- (cantus'{o} is {ordifig}');
+    indicant () <- (cantus'o[0] is {ordidxfig}');
+    indicant () <- (cantus'{c} is {catalogfig}');
+    indicant () <- (cantus'c["a"] is {catakeyfig}');
+
 };
 </DOCTRINA>

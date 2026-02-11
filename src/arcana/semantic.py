@@ -39,6 +39,7 @@ class _SemContext:
     max_loop_depth: int = 3 # 最大ループネスト深度
     warnings: List[str] = None  # type: ignore
     env: Dict[str, str] = None  # 比較用型環境
+    in_vardecl_init: bool = False
 
     def __post_init__(self) -> None:
         if self.warnings is None:
@@ -118,7 +119,14 @@ def _sem_stmt(s: A.Stmt, ctx: _SemContext) -> None:
         ctx.env[s.name] = s.typ
 
         if s.init is not None:
-            _sem_expr(s.init, ctx)
+            old = ctx.in_vardecl_init
+            ctx.in_vardecl_init = True
+            
+            try:
+                _sem_expr(s.init, ctx)
+            finally:
+                ctx.in_vardecl_init = old
+
             rhs_t = infer_expr_type(s.init, ctx.env) # 右辺の型チェック
             if rhs_t is not None and rhs_t != s.typ: # 型が合わなかったら
                 raise semantic_error(
@@ -263,6 +271,39 @@ def _sem_expr(e: A.Expr, ctx: _SemContext) -> None:
         """Identifier () <- (args...)"""
         _sem_call_expr(e, ctx)
         return
+    
+    if isinstance(e, A.DictLit):
+        if not ctx.in_vardecl_init:
+            raise semantic_error(
+                code=ErrorCode.PARSE_UNSUPPORTED_SYNTAX,  # 既存で流用するなら
+                message="Catalogus ad terram descendere debet: VCON tantum.",
+                span=e.span,
+            )
+        # 中身もチェック（とりあえず式として辿る）
+        for k, v in e.pairs:
+            _sem_expr(k, ctx)
+            _sem_expr(v, ctx)
+        return
+    
+    if isinstance(e, A.IndexExpr):
+        # var[...] only
+        if not isinstance(e.target, A.Name):
+            raise semantic_error(
+                code=ErrorCode.PARSE_UNSUPPORTED_SYNTAX,
+                message="Indexatio tantum variabili licet.",
+                span=e.span,
+            )
+        _sem_expr(e.target, ctx)
+        _sem_expr(e.key, ctx)
+
+        t = infer_expr_type(e.target, ctx.env)
+        k = infer_expr_type(e.key, ctx.env)
+
+        if t == "ordinata" and k is not None and k != "inte":
+            raise semantic_error(ErrorCode.TYPE_MISMATCH, "Index ordinatae debet esse inte.", e.span)
+        if t == "catalogus" and k is not None and k != "filum":
+            raise semantic_error(ErrorCode.TYPE_MISMATCH, "Clavis catalogi debet esse filum.", e.span)
+        return
 
     # unknown expr node: ignore for now
 
@@ -276,6 +317,7 @@ _BUILTIN_ARITY = {
     "real": (1, 1),
     "filum": (1, 1),
     "ordinata": (0, None), # 可変長引数扱い
+    "catalogus": (0, None), # 可変長引数扱い
     "verum": (1, 1),
 }
 
@@ -315,8 +357,15 @@ def infer_expr_type(e, env) -> str | None:
         return "real"
     if isinstance(e, A.StringLit):
         return "filum"
+    if isinstance(e, A.CantusLit):
+        return "filum"
     if isinstance(e, A.Name):
         return env.get(e.id)
+    if isinstance(e, A.DictLit):
+        return "catalogus"
+    if isinstance(e, A.IndexExpr):
+        return None
+
     if isinstance(e, A.CallExpr):
         # builtin return types
         rt = {
@@ -327,6 +376,7 @@ def infer_expr_type(e, env) -> str | None:
             "real": "real",
             "filum": "filum",
             "ordinata": "ordinata",
+            "catalogus": "catalogus",
             "verum": "verum",
             "indicant": "nihil",
         }.get(e.name)

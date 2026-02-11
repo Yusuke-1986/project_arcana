@@ -24,7 +24,7 @@ CONTROL_LABEL = {
 }
 
 TYPE_LIST = {    
-    "inte", "real", "verum", "filum", "ordinata"
+    "inte", "real", "verum", "filum", "ordinata", "catalogus"
 }
 
 SPECIAL_KEY = { "nihil" }
@@ -66,6 +66,8 @@ TOKEN_SPEC = [
     ("ASSIGN", r"="),
     ("LPAREN", r"\("),
     ("RPAREN", r"\)"),
+    ("LBRACK", r"\["),
+    ("RBRACK", r"\]"),
     ("LBRACE", r"\{"),
     ("RBRACE", r"\}"),
     ("COLON", r":"),

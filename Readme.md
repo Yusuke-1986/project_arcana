@@ -1,4 +1,4 @@
-# arcana programming language v0.3.5
+# arcana programming language v0.3.8
 
 ## feature
 
@@ -63,6 +63,7 @@ words: **cantus**, **nihil**
 | filum | str | ----- |
 | verum | bool | ----- |
 | ordinata | tuple | tuple base, but ordinata has list-like behavior |
+| catalogus | dict | ----- |
 
 ### Operands
 
@@ -180,11 +181,15 @@ comparison = add, [ ( "==" | "><" | "<" | ">" | "<=" | ">=" ), add ] ;
 add = mul, { ( "+" | "-" ), mul } ;
 mul = pow, { ( "*" | "/" | "%" ), pow } ;
 pow = primary, { "**", primary } ;
-primary = call_expr
+primary = dict_lit
+        | call_expr
         | Identifier 
         | number 
         | string
         | "(" , expr , ")" ;
+
+dict_lit = "{", [ dict_pair, { ",", dict_pair } ], "}" ;
+dict_pair = expr, ":", expr ;
 
 ```
 

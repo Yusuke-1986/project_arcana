@@ -21,7 +21,7 @@ class Token:
 # -----------------------------
 # Types
 # -----------------------------
-TypeName = Literal["inte", "real", "verum", "filum", "ordinata"]
+TypeName = Literal["inte", "real", "verum", "filum", "ordinata", "catalogus"]
 
 
 # -----------------------------
@@ -56,9 +56,17 @@ class CantusLit(Expr):
     template: str
 
 @dataclass
+class DictLit(Expr):
+    pairs: list[tuple[Expr, Expr]]
+
+@dataclass
 class Paren(Expr):
     inner: Expr
 
+@dataclass
+class IndexExpr(Expr):
+    target: Expr
+    key: Expr
 
 BinaryOpKind = Literal[
     "aut", "et",

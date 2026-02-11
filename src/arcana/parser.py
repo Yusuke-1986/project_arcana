@@ -10,8 +10,9 @@ from .ast import (
     Stmt, VarDecl, Assign, Move, CallStmt, ExprStmt,
     NihilStmt, BreakStmt, ContinueStmt,
     IfStmt, LoopStmt,
-    Expr, Name, IntLit, RealLit, StringLit, CantusLit, 
+    Expr, Name, IntLit, RealLit, StringLit, CantusLit, DictLit,
     UnaryOp, BinaryOp, CallExpr, Span,Paren
+    ,IndexExpr,
 )
 
 from .error import parse_error, ErrorCode
@@ -365,35 +366,60 @@ class Parser:
             right = self.parse_primary()
             left = BinaryOp(span=self.span0(), op="**", left=left, right=right)
         return left
+    
+    def parse_dict_lit(self) -> DictLit:
+        l = self.eat("LBRACE")
+
+        pairs = []
+        if not self.match("RBRACE"):
+            while True:
+                k = self.parse_expr()
+                self.eat("COLON")
+                v = self.parse_expr()
+                pairs.append((k, v))
+
+                if self.match("COMMA"):
+                    self.eat("COMMA")
+                    # 末尾カンマ許可したいなら： if self.match("RBRACE"): break
+                    continue
+                break
+
+        self.eat("RBRACE")
+        return DictLit(span=l.span if hasattr(l, "span") else self.span0(), pairs=pairs)
+
 
     def parse_primary(self) -> Expr:
+        # ---- atom (base expression) ----
+        if self.match("LBRACE"):
+            base = self.parse_dict_lit()
+
         # call_expr as expression: (IDENT | TYPE) () <- (args_tuple)
-        if self.cur().kind in ("IDENT", "TYPE") and self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
-            return self.parse_call_expr()
+        elif self.cur().kind in ("IDENT", "TYPE") and self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
+            base = self.parse_call_expr()
 
-        if self.match("IDENT"):
-            return Name(span=self.span0(), id=self.eat("IDENT").value)
+        elif self.match("IDENT"):
+            base = Name(span=self.span0(), id=self.eat("IDENT").value)
 
-        if self.match("INT"):
+        elif self.match("INT"):
             v = int(self.eat("INT").value)
-            return IntLit(span=self.span0(), value=v)
+            base = IntLit(span=self.span0(), value=v)
 
-        if self.match("REAL"):
+        elif self.match("REAL"):
             v = float(self.eat("REAL").value)
-            return RealLit(span=self.span0(), value=v)
+            base = RealLit(span=self.span0(), value=v)
 
-        if self.match("STRING"):
+        elif self.match("STRING"):
             s = self.eat("STRING").value
-            return StringLit(span=self.span0(), value=s)
+            base = StringLit(span=self.span0(), value=s)
 
-        if self.match("LPAREN"):
+        elif self.match("LPAREN"):
             self.eat("LPAREN")
             inner = self.parse_expr()
             self.eat("RPAREN")
-            return Paren(span=self.span0(), inner=inner)
-        
-        if self.match("CANTUS"):
-            t = self.eat("CANTUS")  # 'cantus'
+            base = Paren(span=self.span0(), inner=inner)
+
+        elif self.match("CANTUS"):
+            t = self.eat("CANTUS")
             if not self.match("STRING"):
                 raise parse_error(
                     ErrorCode.PARSE_EXPECTED_TOKEN,
@@ -401,10 +427,27 @@ class Parser:
                     self.span0(),
                 )
             template = self.eat("STRING").value
-            return CantusLit(span=t.span if hasattr(t, "span") else self.span0(), template=template)
+            base = CantusLit(span=t.span if hasattr(t, "span") else self.span0(), template=template)
 
-        # prevent using nihil as expression
-        if self.match("SP", "nihil"):
-            raise parse_error(ErrorCode.PARSE_NIHIL_NOT_EXPR, "nihil is not an expression in v0.3; use 'nihil;' as a statement", self.span0())
+        elif self.match("SP", "nihil"):
+            raise parse_error(
+                ErrorCode.PARSE_NIHIL_NOT_EXPR,
+                "nihil is not an expression in v0.3; use 'nihil;' as a statement",
+                self.span0(),
+            )
 
-        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Caerimoniae Sinice haberi non possunt.: {self.cur()}", self.span0())
+        else:
+            raise parse_error(
+                ErrorCode.PARSE_UNEXPECTED_TOKEN,
+                f"Caerimoniae Sinice haberi non possunt.: {self.cur()}",
+                self.span0(),
+            )
+
+        # ---- postfix: indexing (var[key]) ----
+        while self.match("LBRACK"):
+            self.eat("LBRACK")
+            key = self.parse_expr()
+            self.eat("RBRACK")
+            base = IndexExpr(span=getattr(base, "span", self.span0()), target=base, key=key)
+
+        return base

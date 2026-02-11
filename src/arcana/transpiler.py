@@ -49,6 +49,7 @@ class _Transpiler:
         "real": "float",
         "filum": "str",
         "ordinata": "tuple",
+        "catalogus": "dict",
         "verum": "__arcana_verum",
     }
 
@@ -99,6 +100,8 @@ class _Transpiler:
         self._lines.append("        return 'real'")
         self._lines.append("    if isinstance(x, str):")
         self._lines.append("        return 'filum'")
+        self._lines.append("    if isinstance(x, dict):")
+        self._lines.append("        return 'catalogus'")
         self._lines.append("    if isinstance(x, tuple):")
         self._lines.append("        return 'ordinata'")
         self._lines.append("    return f'{type(x).__name__}_python_originis'")
@@ -232,9 +235,16 @@ class _Transpiler:
         # lexer already stripped quotes, so e.template is raw content.
         # Use repr to safely quote, then prefix with f.
         return "f" + repr(e.template)
+    
+    def _expr_DictLit(self, e: A.DictLit) -> str:
+        inner = ", ".join(f"{self._emit_expr(k)}: {self._emit_expr(v)}" for k, v in e.pairs)
+        return "{" + inner + "}"
 
     def _expr_Paren(self, e: A.Paren) -> str:
         return f"({self._emit_expr(e.inner)})"
+    
+    def _expr_IndexExpr(self, e: A.IndexExpr) -> str:
+        return f"{self._emit_expr(e.target)}[{self._emit_expr(e.key)}]"
 
     def _expr_UnaryOp(self, e: A.UnaryOp) -> str:
         if e.op == "non":

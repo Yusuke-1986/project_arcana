@@ -27,3 +27,23 @@ postfix
 a
 a( expr_list, ... )
 a()() ...
+
+Code
+Runtime			
+R0100_VERITATEM_NON_ATTIGI Veritatem non attigi.
+Semantic			
+E0101_BREAK_OUTSIDE_LOOP Nullus discessus est extra reditum.	
+E0102_CONTINUE_OUTSIDE_LOOP	Nulla continuitas extra limites est.	
+E0103_LOOP_NEST_TOO_DEEP Tres reincarnationes, si plures, maledictio est.
+E0110_LOOP_STEP_NOT_POSITIVE stationarius accelerationis
+E0111_LOOP_QUOTA_INVALID Rectus valor, recta via.	
+E0203_ARG_COUNT_MISMATCH Numeri non congruunt. Fortasse mus eos abstulit.
+E0204_TYPE_MISMATCH	Feretrum neque nimis magnum neque nimis parvum esse debet.
+Parse			
+P0001_EXPECTED_TOKEN Accipe {got}, pro {want} apud indicem tesserae {i}.
+P0002_UNEXPECTED_TOKEN Quid est hoc! Quid faciam?: {tok}
+P0010_MAIN_SUBJECTO_REQUIRED Nulla scriptura sine themate est.
+P0011_MAIN_NIHIL_REQUIRED Subiectum veritatem non dat	subjecto: 
+P0021_INVALID_MOVE Aquam sine vase infundere non potes	
+P0030_UNKNOWN_LOOP_HEADER Quaslibet designationes falsas firmiter repudiabimus.: {key}
+P0031_LOOP_PROPOSITIO_REQUIRED Propositiones in vita necessariae sunt.
