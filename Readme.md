@@ -313,6 +313,9 @@ FCON subjecto: nihil () -> {
 | `E0202_NIHIL_NOT_EXPR`         | `NIHIL_NOT_EXPR`         | （必要ならMSGを付与） | `nihil` を式として扱った等 |
 | `E0203_ARG_COUNT_MISMATCH` | `ARG_COUNT_MISMATCH` | `Numeri non congruunt. Fortasse mus eos abstulit.` | builtin / function の引数個数が仕様と一致しない |
 | `E0204_TYPE_MISMATCH` | `TYPE_MISMATCH` | `Feretrum neque nimis magnum neque nimis parvum esse debet.` | 型の不一致 |
+| `E0205_RETURN_TYPE_MISMATCH` | `RETURN_TYPE_MISMATCH` | `Aqua ad mare, arbores ad silvam it` |
+| `E0206_RETURN_OUTSIDE_FUNCTION` | `RETURN_OUTSIDE_FUNCTION` | `Nullus est locus quo extra te ipsum revertaris.` |
+| `E0207_RETURN_TYPE_NIHIL` | `RETURN_TYPE_NIHIL` | `Solum res cum forma reddita.` |
 | **Parse**
 | `P0001_EXPECTED_TOKEN` | `PARSE_EXPECTED_TOKEN` | `Accipe {got}, pro {want} apud indicem tesserae {i}.` | 期待したトークンと違う |
 | `P0002_UNEXPECTED_TOKEN`         | `PARSE_UNEXPECTED_TOKEN`         | `Quid est hoc! Quid faciam?: {tok}` | 想定外トークン |
