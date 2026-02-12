@@ -1,0 +1,34 @@
+<FONS>
+</FONS>
+
+<INTRODUCTIO>
+
+FCON package: ordinata (a:inte, b:filum, c: real, d:ordinata, e: catalogus) -> {
+    VCON counter: ordinata = ordinata () <- (a, b, c, d, e);
+            
+    REDITUS counter;
+
+};
+
+</INTRODUCTIO>
+
+<DOCTRINA>
+FCON subjecto: nihil () -> {
+    VCON d: ordinata = ordinata() <- (1,2,4,8); 
+    VCON e: catalogus = {"a": 4, "b": 5};
+    VCON ans:ordinata = package () <- (1, "this is string", 0.25, d, e);
+    VCON i: inte = 0;
+
+    RECURSIO (propositio: (1), quota: 5) -> {
+        indicant () <- (ans[i]);
+        SI propositio: (i < 4){
+            VERUM{
+                i = i + 1;
+            }
+            FALSUM{
+                effigium;
+            }
+        };
+    };
+};
+</DOCTRINA>

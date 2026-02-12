@@ -40,6 +40,8 @@ class _SemContext:
     warnings: List[str] = None  # type: ignore
     env: Dict[str, str] = None  # 比較用型環境
     in_vardecl_init: bool = False
+    current_return: str | None = None
+    in_function: bool = False
 
     def __post_init__(self) -> None:
         if self.warnings is None:
@@ -111,8 +113,44 @@ def _sem_stmt(s: A.Stmt, ctx: _SemContext) -> None:
     if isinstance(s, A.NihilStmt):
         """nihil;"""
         return
+    # RditusStmt処理を追加（今はtranspiler側だけでsemanticに無いので入れる）
+    if isinstance(s, A.RditusStmt):
+        if not ctx.in_function:
+            raise semantic_error(ErrorCode.RETURN_OUTSIDE_FUNCTION, "Nullus est locus quo extra te ipsum revertaris", s.span)
 
-    # VarDecl / Assign / Move / CallStmt / ExprStmt
+        if ctx.current_return == "nihil":
+            raise semantic_error(ErrorCode.RETURN_TYPE_NIHIL, "Solum res cum forma reddita", s.span)
+
+        _sem_expr(s.value, ctx)
+        got = infer_expr_type(s.value, ctx.env)
+        if got is not None and got != ctx.current_return:
+            raise semantic_error(ErrorCode.RETURN_TYPE_MISMATCH, "Aqua ad mare, arbores ad silvam it.", s.span)
+        return
+
+
+    # FuncDecl / VarDecl / Assign / Move / CallStmt / ExprStmt
+    if isinstance(s, A.FuncDecl):
+        """FCON name:Type (arg1:Type, arg2:Type, ...) { REDITUS expr; }"""
+        # 変数を型環境に登録（同名再宣言チェックは今は省略でOK）
+        ctx.env[s.name] = s.type
+        # print(s.name, s.type)
+
+        # 引数の型環境登録
+        old_env = ctx.env.copy()
+        old_ret, old_in = ctx.current_return, ctx.in_function
+        ctx.current_return, ctx.in_function = s.type, True
+        for arg in s.args:
+            ctx.env[arg.name] = arg.type
+
+        try:
+            for st in s.body:
+                _sem_stmt(st, ctx)
+        finally:
+            ctx.current_return, ctx.in_function = old_ret, old_in  # 型環境を元に戻す
+            ctx.env = old_env  # 型環境を元に戻す
+        
+        return
+
     if isinstance(s, A.VarDecl):
         """VCON name:Type = expr;"""
         # 変数を型環境に登録（同名再宣言チェックは今は省略でOK）

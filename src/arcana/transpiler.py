@@ -109,9 +109,9 @@ class _Transpiler:
 
     # ---- sections ----
     def _emit_section_intro(self, intro: A.IntroSection) -> None:
-        # Currently: just emit statements at top-level
+        ctx = _EmitCtx(indent=0)
         for st in intro.stmts:
-            self._emit_stmt(st, _EmitCtx(indent=0))
+            self._emit_stmt(st, ctx)
         if intro.stmts:
             self._lines.append("")
 
@@ -126,6 +126,7 @@ class _Transpiler:
 
     # ---- stmt dispatch ----
     def _emit_stmt(self, st: A.Stmt, ctx: _EmitCtx) -> None:
+        # print(f"[arcana: transpiler] emitting stmt: {type(st).__name__}")
         fn = getattr(self, f"_stmt_{type(st).__name__}", None)
         if fn is None:
             raise NotImplementedError(f"Transpiler missing stmt handler for: {type(st).__name__}")
@@ -133,6 +134,20 @@ class _Transpiler:
 
     def _stmt_NihilStmt(self, st: A.NihilStmt, ctx: _EmitCtx) -> None:
         self._lines.append(ctx.pad() + "pass")
+
+    def _stmt_RditusStmt(self, st: A.RditusStmt, ctx: _EmitCtx) -> None:
+        self._lines.append(ctx.pad() + f"return {self._emit_expr(st.value)}")
+
+    def _stmt_FuncDecl(self, st: A.FuncDecl, ctx: _EmitCtx) -> None:
+        # print(st.name, st.args)
+        self._lines.append(ctx.pad() + f"def {st.name}({', '.join([f'{arg.name}' for arg in st.args])}):")
+        # print(self._lines)
+        body_ctx = _EmitCtx(indent=ctx.indent + 4)
+        for s in st.body:
+            self._emit_stmt(s, body_ctx)
+        if not st.body:
+            self._lines.append(body_ctx.pad() + "    pass")
+        self._lines.append("")
 
     def _stmt_VarDecl(self, st: A.VarDecl, ctx: _EmitCtx) -> None:
         if st.init is None:

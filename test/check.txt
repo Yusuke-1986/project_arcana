@@ -39,6 +39,9 @@ E0110_LOOP_STEP_NOT_POSITIVE stationarius accelerationis
 E0111_LOOP_QUOTA_INVALID Rectus valor, recta via.	
 E0203_ARG_COUNT_MISMATCH Numeri non congruunt. Fortasse mus eos abstulit.
 E0204_TYPE_MISMATCH	Feretrum neque nimis magnum neque nimis parvum esse debet.
+E0205_RETURN_TYPE_MISMATCH Aqua ad mare, arbores ad silvam it.
+E0206_RETURN_OUTSIDE_FUNCTION Nullus est locus quo extra te ipsum revertaris.
+E0207_RETURN_TYPE_NIHIL Solum res cum forma reddita.
 Parse			
 P0001_EXPECTED_TOKEN Accipe {got}, pro {want} apud indicem tesserae {i}.
 P0002_UNEXPECTED_TOKEN Quid est hoc! Quid faciam?: {tok}

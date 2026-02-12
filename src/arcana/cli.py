@@ -1,23 +1,30 @@
 # arcana.py　ver.0.3.8
 # Arcana minimal runner
 import argparse
+from dataclasses import asdict, is_dataclass
 
 from .lexer import *
 from .ast import *
 from .transpiler import *
 # import sys
+# from pprint import pprint
+import json
 
 from datetime import datetime
 from .pipeline import compile_source
 
-VERSION = "0.3.8"
+VERSION = "0.4.0"
 
 # --- tracing ---
 TRACE = False
+def dumper(o):
+    if is_dataclass(o):
+        return asdict(o)
+    return str(o)
 
 def tr(msg: str) -> None:
     if TRACE:
-        print(f"[arcana: trace]> {msg}")
+        print(f"[arcana: trace]> {json.dumps(msg, default=dumper, indent=4, ensure_ascii=False)}")
 
 # ========================
 # Runner
@@ -32,7 +39,7 @@ def run_file(path: str, emit: bool=False, no_run: bool=False) -> None:
         art = compile_source(src)
 
         program = art.program
-        tr(f"PARSE: {program}")
+        tr(program)
         warnings = art.warnings
         tr(f"SEMANTIC ANALYSIS COMPLETE: Warnings={ warnings }")
         # sys.exit()

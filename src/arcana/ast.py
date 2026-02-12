@@ -15,6 +15,7 @@ class Span:
 
 @dataclass
 class Token:
+    span: Span
     kind: str
     value: str
 
@@ -46,7 +47,6 @@ class IntLit(Expr):
 class RealLit(Expr):
     value: float
 
-
 @dataclass
 class StringLit(Expr):
     value: str
@@ -58,6 +58,10 @@ class CantusLit(Expr):
 @dataclass
 class DictLit(Expr):
     pairs: list[tuple[Expr, Expr]]
+
+@dataclass
+class NihilType(Expr):
+    pass
 
 @dataclass
 class Paren(Expr):
@@ -110,6 +114,13 @@ class NihilStmt(Stmt):
     """nihil;  -> semantic: pass"""
     pass
 
+@dataclass
+class FuncDecl(Stmt):
+    """FCON name:Type (arg1:Type, arg2:Type, ...) { REDITUS expr; }"""
+    name: str
+    type: TypeName
+    args: List[Args]
+    body: List[Stmt]
 
 @dataclass
 class BreakStmt(Stmt):
@@ -122,6 +133,11 @@ class ContinueStmt(Stmt):
     """proximum;  (only inside RECURSIO)"""
     pass
 
+@dataclass
+class RditusStmt(Stmt):
+    """REDITUS expr;"""
+    value: Expr
+
 
 @dataclass
 class VarDecl(Stmt):
@@ -130,6 +146,10 @@ class VarDecl(Stmt):
     typ: TypeName
     init: Optional[Expr] = None
 
+@dataclass
+class Args:
+    name: str
+    type: TypeName
 
 @dataclass
 class Assign(Stmt):

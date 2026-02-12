@@ -7,9 +7,9 @@ from typing import List, Optional
 from .ast import (
     Program, FonsSection, IntroSection, DoctrinaSection, MainFunction,
     ImportStmt,
-    Stmt, VarDecl, Assign, Move, CallStmt, ExprStmt,
-    NihilStmt, BreakStmt, ContinueStmt,
-    IfStmt, LoopStmt,
+    Stmt, FuncDecl, VarDecl, Assign, Move, CallStmt, ExprStmt,
+    NihilStmt, BreakStmt, ContinueStmt, RditusStmt,
+    IfStmt, LoopStmt, Args,
     Expr, Name, IntLit, RealLit, StringLit, CantusLit, DictLit,
     UnaryOp, BinaryOp, CallExpr, Span,Paren
     ,IndexExpr,
@@ -19,6 +19,7 @@ from .error import parse_error, ErrorCode
 
 @dataclass
 class Tok:
+    span: Span
     kind: str
     value: str
 
@@ -52,15 +53,15 @@ class Parser:
             raise parse_error(
             ErrorCode.PARSE_EXPECTED_TOKEN,
             f"Accipe {got}, pro {want} apud indicem tesserae {self.i}.",
-            self.span0(),
+            self.tok_span(),
         )
         t = self.cur()
         self.i += 1
         return t
 
-    def span0(self) -> Span:
+    def tok_span(self) -> Span:
         # lexer側で行列を持ってないなら固定でOK。後で拡張可
-        return Span()
+        return self.cur().span
 
     # ---------- entry ----------
     def parse_program(self) -> Program:
@@ -81,8 +82,10 @@ class Parser:
     def parse_introductio(self) -> IntroSection:
         self.eat("INTROST")
         stmts: List[Stmt] = []
+
         while not self.match("INTROED"):
             stmts.append(self.parse_stmt())
+            
         self.eat("INTROED")
         return IntroSection(stmts=stmts)
 
@@ -98,14 +101,14 @@ class Parser:
         self.eat("KW", "FCON")
         name = self.eat("IDENT").value
         if name != "subjecto":
-            raise parse_error(ErrorCode.PARSE_MAIN_SUBJECTO_REQUIRED, "Nulla scriptura sine themate est.", self.span0())
+            raise parse_error(ErrorCode.PARSE_MAIN_SUBJECTO_REQUIRED, "Nulla scriptura sine themate est.", self.tok_span())
 
         self.eat("COLON")
         # nihil token is SP in your lexer output
         if self.match("SP", "nihil"):
             self.eat("SP", "nihil")
         else:
-            raise parse_error(ErrorCode.PARSE_MAIN_NIHIL_REQUIRED, "Subiectum veritatem non dat.", self.span0())
+            raise parse_error(ErrorCode.PARSE_MAIN_NIHIL_REQUIRED, "Subiectum veritatem non dat.", self.tok_span())
 
         self.eat("LPAREN"); self.eat("RPAREN")
         self.eat("DEF")  # '->'
@@ -123,23 +126,32 @@ class Parser:
         if self.match("SP", "nihil"):
             self.eat("SP", "nihil")
             self.eat("SEMICOLON")
-            return NihilStmt(span=self.span0())
+            return NihilStmt(span=self.tok_span())
+        
+        if self.match("KW", "REDITUS"):
+            self.eat("KW", "REDITUS")
+            value = self.parse_expr()
+            self.eat("SEMICOLON")
+            return RditusStmt(span=self.tok_span(), value=value)
 
         # effigium; / proximum;
         if self.match("CTRL", "effigium"):
             self.eat("CTRL", "effigium")
             self.eat("SEMICOLON")
-            return BreakStmt(span=self.span0())
+            return BreakStmt(span=self.tok_span())
 
         if self.match("CTRL", "proximum"):
             self.eat("CTRL", "proximum")
             self.eat("SEMICOLON")
-            return ContinueStmt(span=self.span0())
+            return ContinueStmt(span=self.tok_span())
 
         # VCON name:Type (= expr)?;
         if self.match("KW", "VCON"):
             return self.parse_vardecl()
-
+        
+        if self.match("KW", "FCON"):
+            return self.parse_funcdecl()
+            
         # SI ...
         if self.match("KW", "SI"):
             return self.parse_if()
@@ -152,24 +164,24 @@ class Parser:
         if self.match("IDENT"):
             # Guard against "+=" legacy pattern: IDENT PLUS ASSIGN ...
             if self.peek(1).kind == "PLUS" and self.peek(2).kind == "ASSIGN":
-                raise parse_error(ErrorCode.PARSE_UNSUPPORTED_SYNTAX, "'+=' is not supported in v0.3. Use: i = i + 1;", self.span0())
+                raise parse_error(ErrorCode.PARSE_UNSUPPORTED_SYNTAX, "'+=' is not supported in v0.3. Use: i = i + 1;", self.tok_span())
 
             # call: (IDENT|TYPE) ( ) FLOW ( ... ) ;
             if self.cur().kind in ("IDENT", "TYPE"):
                 if self.peek(1).kind == "LPAREN" and self.peek(2).kind == "RPAREN" and self.peek(3).kind == "FLOW":
                     call = self.parse_call_expr()
                     self.eat("SEMICOLON")
-                    return CallStmt(span=self.span0(), call=call)
+                    return CallStmt(span=self.tok_span(), call=call)
 
             # move: IDENT FLOW IDENT ;
             if self.peek(1).kind == "FLOW":
                 dst = self.eat("IDENT").value
                 self.eat("FLOW")
                 if not self.match("IDENT"):
-                    raise parse_error(ErrorCode.PARSE_INVALID_MOVE, "Aquam sine vase infundere non potes", self.span0())
+                    raise parse_error(ErrorCode.PARSE_INVALID_MOVE, "Aquam sine vase infundere non potes", self.tok_span())
                 src = self.eat("IDENT").value
                 self.eat("SEMICOLON")
-                return Move(span=self.span0(), dst=dst, src=src)
+                return Move(span=self.tok_span(), dst=dst, src=src)
 
             # assign: IDENT ASSIGN expr ;
             if self.peek(1).kind == "ASSIGN":
@@ -177,14 +189,42 @@ class Parser:
                 self.eat("ASSIGN")
                 value = self.parse_expr()
                 self.eat("SEMICOLON")
-                return Assign(span=self.span0(), name=name, value=value)
+                return Assign(span=self.tok_span(), name=name, value=value)
 
             # expr_stmt fallback: expr ;
             expr = self.parse_expr()
             self.eat("SEMICOLON")
-            return ExprStmt(span=self.span0(), expr=expr)
+            return ExprStmt(span=self.tok_span(), expr=expr)
 
-        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Quid est hoc! Quid faciam?: {self.cur()}", self.span0())
+        raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN, f"Quid est hoc! Quid faciam?: {self.cur()}", self.tok_span())
+
+    def parse_funcdecl(self) -> FuncDecl:
+        # FCON IDENT: TYPE () -> { ... };
+        self.eat("KW", "FCON")
+        name = self.eat("IDENT").value
+        self.eat("COLON")
+        
+        # nihil token is SP in your lexer output
+        if self.match("SP", "nihil"):
+            self.eat("SP", "nihil")
+        else:
+            t= self.eat("TYPE").value 
+
+        self.eat("LPAREN")
+        args: List[Args] = []
+        while not self.match("RPAREN"):
+            args.append(self.parse_args())
+            if self.match("COMMA"):
+                self.eat("COMMA")
+        self.eat("RPAREN")
+        self.eat("DEF")  # '->'
+        self.eat("LBRACE")
+        body: List[Stmt] = []
+        while not self.match("RBRACE"):
+            body.append(self.parse_stmt())
+        self.eat("RBRACE")
+        self.eat("SEMICOLON")
+        return FuncDecl(span=self.tok_span(), name=name, type=t, args=args, body=body)
 
     def parse_vardecl(self) -> VarDecl:
         self.eat("KW", "VCON")
@@ -196,19 +236,27 @@ class Parser:
             self.eat("ASSIGN")
             init = self.parse_expr()
         self.eat("SEMICOLON")
-        return VarDecl(span=self.span0(), name=name, typ=t, init=init)
+        return VarDecl(span=self.tok_span(), name=name, typ=t, init=init)
+
+    def parse_args(self) -> Args:
+        # print(self.cur())
+        name = self.eat("IDENT").value
+        self.eat("COLON")
+        typ = self.eat("TYPE").value
+
+        return Args(name=name, type=typ)
 
     def parse_call_expr(self) -> CallExpr:
         t = self.cur()
         if t.kind not in ("IDENT", "TYPE"):
             raise parse_error(ErrorCode.PARSE_UNEXPECTED_TOKEN,
                       f"Quid est hoc! Quid faciam?: {t}",
-                      self.span0(),)
+                      self.tok_span(),)
         name = self.eat(t.kind).value
         self.eat("LPAREN"); self.eat("RPAREN")
         self.eat("FLOW")  # '<-'
         args = self.parse_args_tuple_required()
-        return CallExpr(span=self.span0(), name=name, args=args)
+        return CallExpr(span=self.tok_span(), name=name, args=args)
 
     def parse_args_tuple_required(self) -> List[Expr]:
         # v0.3: call RHS must be "( ... )" even for single arg: ("Fizz")
@@ -238,7 +286,7 @@ class Parser:
 
         self.eat("RBRACE")
         self.eat("SEMICOLON")
-        return IfStmt(span=self.span0(), cond=cond, then_body=then_body, else_body=else_body)
+        return IfStmt(span=self.tok_span(), cond=cond, then_body=then_body, else_body=else_body)
 
     def parse_block_stmts(self) -> List[Stmt]:
         self.eat("LBRACE")
@@ -284,7 +332,7 @@ class Parser:
             elif key == "acceleratio":
                 step = self.parse_expr()
             else:
-                raise parse_error(ErrorCode.PARSE_UNKNOWN_LOOP_HEADER, f"Quaslibet designationes falsas firmiter repudiabimus.: {key}", self.span0())
+                raise parse_error(ErrorCode.PARSE_UNKNOWN_LOOP_HEADER, f"Quaslibet designationes falsas firmiter repudiabimus.: {key}", self.tok_span())
 
         self.eat("RPAREN")
         self.eat("DEF")  # '->' required
@@ -296,8 +344,8 @@ class Parser:
         self.eat("SEMICOLON")
 
         if cond is None:
-            raise parse_error(ErrorCode.PARSE_LOOP_PROPOSITIO_REQUIRED, "Propositiones in vita necessariae sunt.", self.span0())
-        return LoopStmt(span=self.span0(), cond=cond, quota=quota, step=step, body=body)
+            raise parse_error(ErrorCode.PARSE_LOOP_PROPOSITIO_REQUIRED, "Propositiones in vita necessariae sunt.", self.tok_span())
+        return LoopStmt(span=self.tok_span(), cond=cond, quota=quota, step=step, body=body)
 
     # ---------- expressions (precedence climbing) ----------
     # precedence: ** > */% > +- > comparisons > non > et > aut
@@ -311,7 +359,7 @@ class Parser:
         while self.match("CTRL", "aut"):
             self.eat("CTRL", "aut")
             right = self.parse_and()
-            left = BinaryOp(span=self.span0(), op="aut", left=left, right=right)
+            left = BinaryOp(span=self.tok_span(), op="aut", left=left, right=right)
         return left
 
     def parse_and(self) -> Expr:
@@ -319,7 +367,7 @@ class Parser:
         while self.match("CTRL", "et"):
             self.eat("CTRL", "et")
             right = self.parse_unary()
-            left = BinaryOp(span=self.span0(), op="et", left=left, right=right)
+            left = BinaryOp(span=self.tok_span(), op="et", left=left, right=right)
         return left
 
     def parse_unary(self) -> Expr:
@@ -327,7 +375,7 @@ class Parser:
         if self.match("CTRL", "non"):
             self.eat("CTRL", "non")
             expr = self.parse_unary()
-            return UnaryOp(span=self.span0(), op="non", expr=expr)
+            return UnaryOp(span=self.tok_span(), op="non", expr=expr)
         return self.parse_comparison()
 
     def parse_comparison(self) -> Expr:
@@ -338,7 +386,7 @@ class Parser:
             op_map = {"EQ": "==", "NE": "><", "LT": "<", "GT": ">", "LE": "<=", "GE": ">="}
             op = op_map[op_tok.kind]
             right = self.parse_add()
-            return BinaryOp(span=self.span0(), op=op, left=left, right=right)
+            return BinaryOp(span=self.tok_span(), op=op, left=left, right=right)
         return left
 
     def parse_add(self) -> Expr:
@@ -347,7 +395,7 @@ class Parser:
             op_tok = self.eat(self.cur().kind)
             op = "+" if op_tok.kind == "PLUS" else "-"
             right = self.parse_mul()
-            left = BinaryOp(span=self.span0(), op=op, left=left, right=right)
+            left = BinaryOp(span=self.tok_span(), op=op, left=left, right=right)
         return left
 
     def parse_mul(self) -> Expr:
@@ -356,7 +404,7 @@ class Parser:
             op_tok = self.eat(self.cur().kind)
             op = {"STAR": "*", "SLASH": "/", "PERCENT": "%"}[op_tok.kind]
             right = self.parse_pow()
-            left = BinaryOp(span=self.span0(), op=op, left=left, right=right)
+            left = BinaryOp(span=self.tok_span(), op=op, left=left, right=right)
         return left
 
     def parse_pow(self) -> Expr:
@@ -364,7 +412,7 @@ class Parser:
         while self.match("POW"):
             self.eat("POW")
             right = self.parse_primary()
-            left = BinaryOp(span=self.span0(), op="**", left=left, right=right)
+            left = BinaryOp(span=self.tok_span(), op="**", left=left, right=right)
         return left
     
     def parse_dict_lit(self) -> DictLit:
@@ -385,7 +433,7 @@ class Parser:
                 break
 
         self.eat("RBRACE")
-        return DictLit(span=l.span if hasattr(l, "span") else self.span0(), pairs=pairs)
+        return DictLit(span=l.span if hasattr(l, "span") else self.tok_span(), pairs=pairs)
 
 
     def parse_primary(self) -> Expr:
@@ -398,25 +446,25 @@ class Parser:
             base = self.parse_call_expr()
 
         elif self.match("IDENT"):
-            base = Name(span=self.span0(), id=self.eat("IDENT").value)
+            base = Name(span=self.tok_span(), id=self.eat("IDENT").value)
 
         elif self.match("INT"):
             v = int(self.eat("INT").value)
-            base = IntLit(span=self.span0(), value=v)
+            base = IntLit(span=self.tok_span(), value=v)
 
         elif self.match("REAL"):
             v = float(self.eat("REAL").value)
-            base = RealLit(span=self.span0(), value=v)
+            base = RealLit(span=self.tok_span(), value=v)
 
         elif self.match("STRING"):
             s = self.eat("STRING").value
-            base = StringLit(span=self.span0(), value=s)
+            base = StringLit(span=self.tok_span(), value=s)
 
         elif self.match("LPAREN"):
             self.eat("LPAREN")
             inner = self.parse_expr()
             self.eat("RPAREN")
-            base = Paren(span=self.span0(), inner=inner)
+            base = Paren(span=self.tok_span(), inner=inner)
 
         elif self.match("CANTUS"):
             t = self.eat("CANTUS")
@@ -424,23 +472,23 @@ class Parser:
                 raise parse_error(
                     ErrorCode.PARSE_EXPECTED_TOKEN,
                     "Cantus requirit filum.",
-                    self.span0(),
+                    self.tok_span(),
                 )
             template = self.eat("STRING").value
-            base = CantusLit(span=t.span if hasattr(t, "span") else self.span0(), template=template)
+            base = CantusLit(span=t.span if hasattr(t, "span") else self.tok_span(), template=template)
 
         elif self.match("SP", "nihil"):
             raise parse_error(
                 ErrorCode.PARSE_NIHIL_NOT_EXPR,
                 "nihil is not an expression in v0.3; use 'nihil;' as a statement",
-                self.span0(),
+                self.tok_span(),
             )
 
         else:
             raise parse_error(
                 ErrorCode.PARSE_UNEXPECTED_TOKEN,
                 f"Caerimoniae Sinice haberi non possunt.: {self.cur()}",
-                self.span0(),
+                self.tok_span(),
             )
 
         # ---- postfix: indexing (var[key]) ----
@@ -448,6 +496,6 @@ class Parser:
             self.eat("LBRACK")
             key = self.parse_expr()
             self.eat("RBRACK")
-            base = IndexExpr(span=getattr(base, "span", self.span0()), target=base, key=key)
+            base = IndexExpr(span=getattr(base, "span", self.tok_span()), target=base, key=key)
 
         return base
